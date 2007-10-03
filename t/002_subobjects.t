@@ -11,8 +11,8 @@ BEGIN { use_ok 'Coat::Persistent' }
     extends 'Coat::Persistent';
 
     owns_one 'Avatar';
-    has 'name' => (isa => 'Str');
-    has 'age' => (isa => 'Int');
+    has_p 'name' => (isa => 'Str');
+    has_p 'age' => (isa => 'Int');
 
     __PACKAGE__->map_to_dbi('csv', 'f_dir=./t/csv-test-database');
     
@@ -21,7 +21,7 @@ BEGIN { use_ok 'Coat::Persistent' }
     use Coat::Persistent;
     extends 'Coat::Persistent';
 
-    has 'imgpath' => (isa => 'Str');
+    has_p 'imgpath' => (isa => 'Str');
     
     __PACKAGE__->map_to_dbi('csv', 'f_dir=./t/csv-test-database');
 }
