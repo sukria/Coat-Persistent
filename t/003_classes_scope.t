@@ -10,14 +10,14 @@ BEGIN { use_ok 'Coat::Persistent' }
     use Coat::Persistent;
     extends 'Coat::Persistent';
 
-    has 'a';
+    has_p 'a';
 
     package B;
     use Coat;
     use Coat::Persistent;
     extends 'Coat::Persistent';
 
-    has 'b';
+    has_p 'b';
 }
 
 my @a_fields   = sort keys %{ Coat::Meta->all_attributes( 'A' ) };

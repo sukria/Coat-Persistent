@@ -12,8 +12,7 @@ use base qw(Exporter);
 
 $AUTHORITY = 'cpan:SUKRIA';
 $VERSION   = '0.0_0.1';
-
-@EXPORT = qw(has owns_one);
+@EXPORT    = qw(has_p owns_one);
 
 # Static method & stuff
 
@@ -45,7 +44,7 @@ sub map_to_dbi
 
 # This is done to wrap the original Coat::has method so we can 
 # generate finders for each attribute declared 
-my $has_code = sub {
+sub has_p {
     my ($attr, %options) = @_;
 
     Coat::has($attr, ('!caller' => caller, %options));
@@ -63,8 +62,8 @@ my $has_code = sub {
         my $sth = $dbh->prepare($sql);
         $sth->execute($value) or confess "Unable to execute query $sql";
         my $rows = $sth->fetchall_arrayref({});
-        
-        # now convert each row returned to the object
+
+# now convert each row returned to the object
         my @objects = map { $class->new(%$_) } @$rows;
 
         return wantarray 
@@ -77,16 +76,13 @@ my $has_code = sub {
         no warnings 'redefine', 'prototype';
         *$symbol = $finder;
     }
-};
-
-my $has_with_finder = "Coat::Persistent::has";
-{ 
-    no strict 'refs';
-    no warnings 'redefine', 'prototype';
-    *$has_with_finder = $has_code; 
 }
 
-has 'id' => (isa => 'Int') ;
+sub import
+{
+    has_p('id' => (isa => 'Int')) ;
+    Coat::Persistent->export_to_level( 1, @_ );
+}
 
 sub find
 {
