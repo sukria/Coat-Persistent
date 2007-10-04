@@ -8,14 +8,12 @@ BEGIN { use_ok 'Coat::Persistent' }
     package A;
     use Coat;
     use Coat::Persistent;
-    extends 'Coat::Persistent';
 
     has_p 'a';
 
     package B;
     use Coat;
     use Coat::Persistent;
-    extends 'Coat::Persistent';
 
     has_p 'b';
 }

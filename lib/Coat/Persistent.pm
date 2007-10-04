@@ -18,7 +18,7 @@ $VERSION   = '0.0_0.1';
 
 my $MAPPINGS = {};
 sub mappings { $MAPPINGS }
-sub dbh { $MAPPINGS->{'!dbh'}{$_[1]} }
+sub dbh { $MAPPINGS->{'!dbh'}{$_[1]} || $MAPPINGS->{'!dbh'}{'!default'} }
 sub driver { $MAPPINGS->{'!driver'}{$_[1]} }
 
 # This is the configration stuff, you basically bind a class to
@@ -63,7 +63,7 @@ sub has_p {
         $sth->execute($value) or confess "Unable to execute query $sql";
         my $rows = $sth->fetchall_arrayref({});
 
-# now convert each row returned to the object
+        # now convert each row returned to the object
         my @objects = map { $class->new(%$_) } @$rows;
 
         return wantarray 
@@ -81,6 +81,7 @@ sub has_p {
 sub import
 {
     has_p('id' => (isa => 'Int')) ;
+    Coat::_extends_class(['Coat::Persistent'], caller);
     Coat::Persistent->export_to_level( 1, @_ );
 }
 
@@ -249,3 +250,34 @@ sub save
 
 1;
 __END__
+=pod
+
+=head1 NAME
+
+Coat::Persistent -- Simple Object-Relational mapping for Coat objects
+
+=head1 DESCRIPTION
+
+Coat::Persistent is an object to relational-databases mapper, it allows you to
+build instance of Coat objects and save them into a databse transparently.
+
+=head1 CONFIGURATION
+
+=head1 SYNTAX
+
+=head1 METHODS
+
+=head1 SEE ALSO
+
+=head1 AUTHOR
+
+This module was written by Alexis Sukrieh E<lt>sukria+perl@sukria.netE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2007 by Alexis Sukrieh.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself. 
+
+=cut

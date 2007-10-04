@@ -8,7 +8,6 @@ BEGIN { use_ok 'Coat::Persistent' }
     package Person;
     use Coat;
     use Coat::Persistent;
-    extends 'Coat::Persistent';
 
     has_p 'name' => (isa => 'Str');
     has_p 'age' => (isa => 'Int');

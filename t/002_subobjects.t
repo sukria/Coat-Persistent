@@ -8,7 +8,6 @@ BEGIN { use_ok 'Coat::Persistent' }
     package Person;
     use Coat;
     use Coat::Persistent;
-    extends 'Coat::Persistent';
 
     owns_one 'Avatar';
     has_p 'name' => (isa => 'Str');
@@ -19,7 +18,6 @@ BEGIN { use_ok 'Coat::Persistent' }
     package Avatar;
     use Coat;
     use Coat::Persistent;
-    extends 'Coat::Persistent';
 
     has_p 'imgpath' => (isa => 'Str');
     
