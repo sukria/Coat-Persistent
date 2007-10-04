@@ -121,7 +121,7 @@ sub owns_one {
     my $owned_class_sql = _to_sql($owned_class);
     # record the foreign key 
     my $foreign_key = "${owned_class_sql}_id";
-    has $foreign_key => (isa => 'Int', '!caller' => $class);
+    has_p $foreign_key => (isa => 'Int', '!caller' => $class);
 
     my $symbol = "${class}::${owned_class_sql}";
     my $subobject_accessor = sub {
@@ -216,22 +216,19 @@ sub save
         unless defined $dbh;
     
     my $table = $self->_to_sql;
-    my @fields = keys %{ Coat::Meta->all_attributes( ref $self ) };
-
     my @values;
+    my @fields = keys %{ Coat::Meta->all_attributes( ref $self ) };
 
     # if we have an id, update
     if (defined $self->id) {
-        my $sql = "update $table set ";
-        foreach my $field (@fields) {
-            next if $field eq 'id';
-            $sql .= "$field=? ";
-            push @values, $self->$field;
-        }
-        $sql .= "where id = ?";
+        @values = map { $self->$_ } @fields;
+        my $sql = "update $table set " 
+                . join (", ", map { "$_ = ?" } @fields)
+                . " where id = ?";
         
         my $sth = $dbh->prepare($sql);
-        $sth->execute(@values, $self->id);
+        $sth->execute(@values, $self->id) 
+        or confess "Unable to execute query \"$sql\" : $!";
     }
 
     # no id, insert with a valid id
@@ -240,10 +237,10 @@ sub save
         $self->id( $self->_next_id );
         
         my $sql = "insert into $table ("
-        . (join ", ", @fields)
-        .") values ("
-        . (join ", ", map { '?' } @fields)
-        .")";
+                . (join ", ", @fields)
+                . ") values ("
+                . (join ", ", map { '?' } @fields)
+                . ")";
 
         foreach my $field (@fields) {
             push @values, $self->$field;
@@ -251,7 +248,8 @@ sub save
     
         my $sth = $dbh->prepare($sql);
         $sth->execute(@values) 
-            or confess "Unable to execute query : $sql with ".join(", ", @values);
+            or confess "Unable to execute query : \"$sql\" with "
+            .join(", ", @values) . " : $!";
         $self->_unlock;
     }
 
