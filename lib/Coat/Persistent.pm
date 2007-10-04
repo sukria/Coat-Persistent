@@ -18,7 +18,7 @@ $VERSION   = '0.0_0.1';
 
 my $MAPPINGS = {};
 sub mappings { $MAPPINGS }
-sub dbh { $MAPPINGS->{'!dbh'}{$_[1]} || $MAPPINGS->{'!dbh'}{'!default'} }
+sub dbh { $MAPPINGS->{'!dbh'}{$_[0]} || $MAPPINGS->{'!dbh'}{'!default'} }
 sub driver { $MAPPINGS->{'!driver'}{$_[1]} }
 
 # This is the configration stuff, you basically bind a class to
@@ -27,6 +27,9 @@ sub map_to_dbi
 {
     my ($class, $driver, @options) = @_;
     confess "Static method cannot be called from instance" if ref $class;
+
+    # if map_to_dbi is called from Coat::Persistent, this is the default dbh
+    $class = '!default' if $class eq 'Coat::Persistent';
 
     my $drivers = {
         mysql => 'dbi:mysql',
@@ -42,6 +45,23 @@ sub map_to_dbi
     $MAPPINGS->{'!dbh'}{$class} = DBI->connect("${driver}:${table}", $user, $pass);
 }
 
+# The generic SQL finder, takes a SQL query and map rows returned 
+# to objects of the class
+sub find_by_sql
+{
+    my ($class, $sql, @values) = @_;
+
+    my $dbh = $class->dbh;
+    my $sth = $dbh->prepare($sql);
+    $sth->execute(@values) or confess "Unable to execute query $sql";
+    my $rows = $sth->fetchall_arrayref({});
+    
+    my @objects = map { $class->new(%$_) } @$rows;
+    return wantarray 
+        ? @objects
+        : $objects[0];
+}
+
 # This is done to wrap the original Coat::has method so we can 
 # generate finders for each attribute declared 
 sub has_p {
@@ -55,20 +75,8 @@ sub has_p {
         confess "Cannot be called from an instance" if ref $class;
         confess "Cannot find without a value" unless defined $value;
 
-        my $dbh = Coat::Persistent->dbh($class);
         my $table = $class->_to_sql;
-
-        my $sql = "select * from $table where $attr = ?";
-        my $sth = $dbh->prepare($sql);
-        $sth->execute($value) or confess "Unable to execute query $sql";
-        my $rows = $sth->fetchall_arrayref({});
-
-        # now convert each row returned to the object
-        my @objects = map { $class->new(%$_) } @$rows;
-
-        return wantarray 
-            ? @objects
-            : $objects[0];
+        $class->find_by_sql("select * from $table where $attr = ?", $value);
     };
     my $symbol = "${class}::find_by_${attr}";
     { 
@@ -160,7 +168,8 @@ sub _lock_write
     my ($self) = @_;
     return 1 if Coat::Persistent->driver( ref $self ) ne 'mysql';
 
-    my $dbh = Coat::Persistent->dbh(ref $self);
+    my $class = ref $self;
+    my $dbh = $class->dbh;
     my $table = $self->_to_sql;
     $dbh->do("LOCK TABLE $table WRITE") 
         or confess "Unable to lock table $table";
@@ -171,14 +180,17 @@ sub _unlock
     my ($self) = @_;
     return 1 if Coat::Persistent->driver( ref $self ) ne 'mysql';
 
-    my $dbh = Coat::Persistent->dbh(ref $self);
+    my $class = ref $self;
+    my $dbh = $class->dbh;
     $dbh->do("UNLOCK TABLES") 
         or confess "Unable to lock tables";
 }
 
 sub _next_id {
     my ($self) = @_;
-    my $dbh = Coat::Persistent->dbh(ref $self);
+    
+    my $class = ref $self;
+    my $dbh = $class->dbh;
     my $table = $self->_to_sql;
     
     my $sth = $dbh->prepare("select id as last_id "
@@ -197,10 +209,12 @@ sub _next_id {
 sub save
 {
     my ($self) = @_;  
+    my $class = ref $self;
+    my $dbh = $class->dbh;
+
     confess "Cannot save without a mapping defined for class ".ref $self 
-        unless defined Coat::Persistent->dbh(ref $self);
+        unless defined $dbh;
     
-    my $dbh = Coat::Persistent->dbh(ref $self);
     my $table = $self->_to_sql;
     my @fields = keys %{ Coat::Meta->all_attributes( ref $self ) };
 
