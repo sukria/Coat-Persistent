@@ -26,8 +26,8 @@ BEGIN { use_ok 'Coat::Persistent' }
 
 # fixture
 my $dbh = Coat::Persistent->dbh('Person');
-$dbh->do("CREATE TABLE Person (id INTEGER, Avatar_id INTEGER, name CHAR(64), age INTEGER)");
-$dbh->do("CREATE TABLE Avatar (id INTEGER, imgpath CHAR(255))");
+$dbh->do("CREATE TABLE person (id INTEGER, avatar_id INTEGER, name CHAR(64), age INTEGER)");
+$dbh->do("CREATE TABLE avatar (id INTEGER, imgpath CHAR(255))");
 
 # TESTS 
 
@@ -37,9 +37,9 @@ $a->save;
 my $p = new Person name => "Joe", age => 17;
 ok( $p->save, '$p->save' );
 
-ok( $p->Avatar($a), '$p->Avatar($a)' );
-is( $p->Avatar->id, $a->id, '$p->Avatar->id == $a->id' );
+ok( $p->avatar($a), '$p->avatar($a)' );
+is( $p->avatar->id, $a->id, '$p->avatar->id == $a->id' );
 
 # remove the test db
-$dbh->do("DROP TABLE Person");
-$dbh->do("DROP TABLE Avatar");
+$dbh->do("DROP TABLE person");
+$dbh->do("DROP TABLE avatar");
