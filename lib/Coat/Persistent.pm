@@ -110,11 +110,12 @@ sub owns_one {
     my ($owned_class) = @_;
     my $class = caller;
     
+    my $owned_class_sql = _to_sql($owned_class);
     # record the foreign key 
-    my $foreign_key = "${owned_class}_id";
+    my $foreign_key = "${owned_class_sql}_id";
     has $foreign_key => (isa => 'Int', '!caller' => $class);
 
-    my $symbol = "${class}::${owned_class}";
+    my $symbol = "${class}::${owned_class_sql}";
     my $subobject_accessor = sub {
         my ($self, $object) = @_;
 
@@ -143,20 +144,15 @@ sub owns_one {
 
 # instance method & stuff
 
+sub _to_class { 
+    join '::', map { ucfirst $_ } split '_', $_[0] 
+}
 
 sub _to_sql
 {
-    my ($self) = @_;
-    my $table;
-    if (ref $self) {
-        $table = ref $self 
-    }
-    else {
-        $table = $self;
-    }
-
-    $table =~ s/::/__/g;
-    $table;
+    my $table = (ref $_[0]) ? lc ref $_[0] : lc $_[0];
+    $table =~ s/::/_/g;
+    return $table;
 }
 
 sub _lock_write

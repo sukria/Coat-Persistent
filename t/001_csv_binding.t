@@ -17,7 +17,7 @@ BEGIN { use_ok 'Coat::Persistent' }
 
 # fixture
 my $dbh = Coat::Persistent->dbh('Person');
-$dbh->do("CREATE TABLE Person (id INTEGER, name CHAR(64), age INTEGER)");
+$dbh->do("CREATE TABLE person (id INTEGER, name CHAR(64), age INTEGER)");
 
 # TESTS 
 
@@ -52,4 +52,4 @@ isa_ok( $p, 'Person' );
 is( $p->name, $brenda->name, '$p is equal to $brenda' );
 
 # remove the test db
-$dbh->do("DROP TABLE Person");
+$dbh->do("DROP TABLE person");
