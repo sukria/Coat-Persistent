@@ -12,6 +12,7 @@ BEGIN { use_ok 'Coat::Persistent' }
 }
 
 Person->map_to_dbi('csv', 'f_dir=./t/csv-test-database');
+# Person->map_to_dbi('mysql' => 'coat', 'dbuser' => 'dbpass');
 
 my $dbh = Person->dbh;
 $dbh->do("CREATE TABLE person (id INTEGER, name CHAR(64), age INTEGER)");
