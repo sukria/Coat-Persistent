@@ -13,16 +13,15 @@ BEGIN { use_ok 'Coat::Persistent' }
     has_p 'name' => (isa => 'Str');
     has_p 'age' => (isa => 'Int');
 
-    __PACKAGE__->map_to_dbi('csv', 'f_dir=./t/csv-test-database');
-    
     package Avatar;
     use Coat;
     use Coat::Persistent;
 
     has_p 'imgpath' => (isa => 'Str');
-    
-    __PACKAGE__->map_to_dbi('csv', 'f_dir=./t/csv-test-database');
 }
+
+Coat::Persistent->map_to_dbi('csv', 'f_dir=./t/csv-test-database');
+# Coat::Persistent->map_to_dbi('mysql' => 'coat', 'dbuser' => 'dbpass');
 
 # fixture
 my $dbh = Person->dbh;
@@ -39,13 +38,12 @@ ok( $p->save, '$p->save' );
 
 ok( $p->avatar($a), '$p->avatar($a)' );
 is( $p->avatar->id, $a->id, '$p->avatar->id == $a->id' );
-
-is($p->avatar_id, $a->id, '$p->avatar_id == $a->id');
+is( $p->avatar_id, $a->id, '$p->avatar_id == $a->id');
 
 ok( $p->save, '$p->save');
 
 $p = Person->find($p->id);
-ok( defined $p->avatar, '$p->avatar is defined after a ->find');
+ok( defined $p->avatar, '$p->avatar is defined after a find');
 is( $p->avatar->id, $a->id, '$p->avatar->id == $a->id' );
 
 

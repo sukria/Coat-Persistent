@@ -17,9 +17,11 @@ $VERSION   = '0.0_0.1';
 # Static method & stuff
 
 my $MAPPINGS = {};
+my $FIELDS = {};
+
 sub mappings { $MAPPINGS }
-sub dbh { $MAPPINGS->{'!dbh'}{$_[0]} || $MAPPINGS->{'!dbh'}{'!default'} }
-sub driver { $MAPPINGS->{'!driver'}{$_[1]} }
+sub dbh    { $MAPPINGS->{'!dbh'}{$_[0]}    || $MAPPINGS->{'!dbh'}{'!default'} }
+sub driver { $MAPPINGS->{'!driver'}{$_[0]} || $MAPPINGS->{'!driver'}{'!default'} }
 
 # This is the configration stuff, you basically bind a class to
 # a DBI driver
@@ -56,7 +58,17 @@ sub find_by_sql
     $sth->execute(@values) or confess "Unable to execute query $sql";
     my $rows = $sth->fetchall_arrayref({});
     
-    my @objects = map { $class->new(%$_) } @$rows;
+    my @objects = map { 
+        my $obj = $class->new;
+        # column returned by the query that are valid attrs are set,
+        # other are set as virtual attr (without the accessor).
+        foreach my $attr (keys %$_) {
+            Coat::Meta->has( $class, $attr ) 
+                ? $obj->$attr($_->{$attr})
+                : $obj->{$attr} = $_->{$attr};
+        }
+        $obj;
+    } @$rows;
     return wantarray 
         ? @objects
         : $objects[0];
@@ -88,7 +100,10 @@ sub has_p {
 
 sub import
 {
-    has_p('id' => (isa => 'Int')) ;
+    # a Coat::Persistent object must have an id (this is the primary key)
+    has_p id => (isa => 'Int') ;
+
+    # our caller inherits from Coat::Persistent
     Coat::_extends_class(['Coat::Persistent'], caller);
     Coat::Persistent->export_to_level( 1, @_ );
 }
@@ -166,9 +181,9 @@ sub _to_sql
 sub _lock_write
 {
     my ($self) = @_;
-    return 1 if Coat::Persistent->driver( ref $self ) ne 'mysql';
-
     my $class = ref $self;
+    return 1 if $class->driver ne 'mysql';
+
     my $dbh = $class->dbh;
     my $table = $self->_to_sql;
     $dbh->do("LOCK TABLE $table WRITE") 
@@ -178,9 +193,9 @@ sub _lock_write
 sub _unlock
 {
     my ($self) = @_;
-    return 1 if Coat::Persistent->driver( ref $self ) ne 'mysql';
-
     my $class = ref $self;
+    return 1 if $class->driver ne 'mysql';
+
     my $dbh = $class->dbh;
     $dbh->do("UNLOCK TABLES") 
         or confess "Unable to lock tables";
