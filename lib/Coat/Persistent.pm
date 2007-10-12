@@ -4,6 +4,7 @@ use Coat;
 use Coat::Meta;
 use Scalar::Util 'blessed';
 
+use Scalar::Util 'looks_like_number';
 use DBI;
 use DBD::CSV;
 use Carp 'confess';
@@ -95,7 +96,7 @@ sub has_p {
         my $table = $class->_to_sql;
         $class->find_by_sql( "select * from $table where $attr = ?", $value );
     };
-    _bind_code_to_symbol($finder, "${caller}::find_by_${attr}");
+    _bind_code_to_symbol( $finder, "${caller}::find_by_${attr}" );
 }
 
 sub import {
@@ -106,15 +107,22 @@ sub import {
     has_p id => ( isa => 'Int', '!caller' => $caller );
 
     # our caller inherits from Coat::Persistent
-    Coat::_extends_class( ['Coat::Persistent'], $caller );
+    eval { Coat::_extends_class( ['Coat::Persistent'], $caller ) };
     Coat::Persistent->export_to_level( 1, @_ );
 }
 
 sub find {
-    my ( $class, $id ) = @_;
+    my ( $class, $value ) = @_;
     confess "Cannot be called from an instance" if ref $class;
-    confess "Cannot find without an id" unless defined $id;
-    $class->find_by_id($id);
+    ( defined $value )
+      ? (
+        ( looks_like_number $value )
+        ? $class->find_by_id($value)
+        : $class->find_by_sql(
+            "select * from " . $class->_to_sql . " where " . $value
+        )
+      )
+      : $class->find_by_sql( "select * from " . $class->_to_sql );
 }
 
 # let's you define a relation like A.b_id -> B
@@ -131,16 +139,16 @@ sub find {
 # TODO : later let the user override the bindings
 
 sub owns_one {
-    my ($owned_class) = @_;
-    my $class = caller;
+    my ($owned_class)   = @_;
+    my $class           = caller;
     my $owned_class_sql = _to_sql($owned_class);
 
     # record the foreign key
     my $foreign_key = "${owned_class_sql}_id";
     has_p $foreign_key => ( isa => 'Int', '!caller' => $class );
 
-    my $symbol             = "${class}::${owned_class_sql}";
-    my $code = sub {
+    my $symbol = "${class}::${owned_class_sql}";
+    my $code   = sub {
         my ( $self, $object ) = @_;
 
         # want to set the subobject
@@ -159,39 +167,39 @@ sub owns_one {
             $owned_class->find( $self->$foreign_key );
         }
     };
-    _bind_code_to_symbol($code, $symbol); 
+    _bind_code_to_symbol( $code, $symbol );
 }
 
 # many relations means an instance of class A owns many instances
-# of class B: 
+# of class B:
 #     $a->bs returns B->find_by_a_id($a->id)
 # * B must provide a 'owns_one A' statement for this to work
 sub owns_many {
-    my ($owned_class) = @_;
-    my $class = caller;
-    my $class_sql = _to_sql($class);
+    my ($owned_class)   = @_;
+    my $class           = caller;
+    my $class_sql       = _to_sql($class);
     my $owned_class_sql = _to_sql($owned_class);
 
     # the accessor : $obj->things for subobject "Thing"
     my $code = sub {
-        my ($self, @list) = @_;
+        my ( $self, @list ) = @_;
+
         # a get
-        if (@_ == 1) {
+        if ( @_ == 1 ) {
             my $accessor = "find_by_${class_sql}_id";
-            return $owned_class->$accessor($self->id);
+            return $owned_class->$accessor( $self->id );
         }
 
         # a set
         else {
             foreach my $obj (@list) {
                 confess "Not an object reference, expected $owned_class"
-                    unless defined blessed $obj;
+                  unless defined blessed $obj;
                 confess "Not an object of class $owned_class (got "
-                        . blessed($obj)
-                        .")"
-                    unless blessed $obj eq $owned_class;
+                  . blessed($obj) . ")"
+                  unless blessed $obj eq $owned_class;
                 $obj->$class_sql($self);
-                push @{$self->{_subobjects}}, $obj
+                push @{ $self->{_subobjects} }, $obj;
             }
         }
     };
@@ -199,9 +207,8 @@ sub owns_many {
 }
 
 # instance method & stuff
-sub _bind_code_to_symbol
-{
-    my ($code, $symbol) = @_;
+sub _bind_code_to_symbol {
+    my ( $code, $symbol ) = @_;
     {
         no strict 'refs';
         no warnings 'redefine', 'prototype';
@@ -309,8 +316,8 @@ sub save {
     }
 
     # if subobjects defined, save them
-    if ($self->{_subobjects}) {
-        foreach my $obj (@{$self->{_subobjects}}) {
+    if ( $self->{_subobjects} ) {
+        foreach my $obj ( @{ $self->{_subobjects} } ) {
             $obj->save;
         }
         delete $self->{_subobjects};
