@@ -4,7 +4,7 @@ WriteMakefile(
     NAME => 'Coat::Persistent',
     VERSION_FROM => 'lib/Coat/Persistent.pm',
     PREREQ_PM => {
-        'Coat' => '0.1_0.5',
+        'Coat' => '0.1_0.6',
         'DBI'  => '0',
         'DBD::CSV' => '0',
     },
