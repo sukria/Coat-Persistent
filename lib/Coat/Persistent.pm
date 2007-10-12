@@ -339,17 +339,135 @@ Coat::Persistent -- Simple Object-Relational mapping for Coat objects
 Coat::Persistent is an object to relational-databases mapper, it allows you to
 build instance of Coat objects and save them into a databse transparently.
 
+You basically define a mapping rule, either global or per-class and play with
+your Coat objects without bothering with SQL for simple cases (selecting,
+inserting, updating). 
+
+Coat::Peristent lets you use SQL if you want to, considering SQL is the best
+language when dealing with compelx queries.
+
+=head1 WHY THIS MODULE ?
+
+There are already very good ORMs for Perl available in the CPAN so why did this
+module get added?
+
+Basically for one reason: I wanted a very simple way to build persistent
+objects for Coat and wanted something near the smart design of Rails'ORM
+(ActiveRecord). Moreover I wanted my ORM to let me send SQL requests if I
+wanted to (so I can do basic actions without SQL and complex queries with SQL).
+
+This module is the result of my experiments of mixing DBI and Coat together,
+although it is a developer release, it works pretty well and fit my needs.
+
+This module is expected to change in the future (don't consider the API to be
+stable at this time), and to grow (hopefully).
+
+=head1 DATA BACKEND
+
+The concept behing this module is the same behind the ORM of Rails : all your
+tables must have a primary key named B<id>. This may become configurable in
+future versions, but in this developer release this is not.
+
+Your table names must be named like the package they map, with the following
+rules applied : lower case, replace "::" by "_". For instance a class Foo::Bar
+should be mapped to a table named "foo_bar".
+
+All foreign key must be named "<table>_id" where table is the name if the
+class mapped formated like said above.
+
 =head1 CONFIGURATION
 
-=head1 SYNTAX
+You have to tell Coat::Persistent how to map a class to a DBI driver. You can
+either choose to define a default mapper (in most of the cases this is what
+you want) or define a mapper for a specific class.
+
+=over 4 
+
+=item B<Coat::Persistent-E<gt>map_to_dbi $driver, @options >
+
+This will set the default mapper. Every class that hasn't a specific mapper set
+will use this one.
+
+=item B<__PACKAGE__-E<gt>map_to_dbi $driver, @options >
+
+This will set a mapper for the current class.
+
+=back
+
+Supported values for B<$driver> are the following :
+
+=over 4
+
+=item I<csv> : this wil use DBI's "DBD:CSV" driver to map your instances to a CSV
+file. B<@options> must contains a string as its first element being like the
+following: "f_dir=<DIRECTORY>" where DIRECTORY is the directory where to store
+de CSV files.
+
+Example:
+
+    packahe Foo;
+    use Coat::Persistent;
+    __PACKAGE__->map_to_dbi('csv', 'f_dir=./t/csv-directory');
+
+=item I<mysql> : this will use DBI's "dbi:mysql" driver to map your instances
+to a MySQL database. B<@options> must be a list that contains repectively: the
+database name, the database user, the database password.
+
+Example:
+
+    package Foo;
+    use Coat::Persistent;
+    __PACKAGE__->map_to_dbi('mysql' => 'dbname', 'dbuser', 'dbpass' );
+
+=back
 
 =head1 METHODS
 
+=over 4
+
+=item B<has_p $name =E<gt> %options>
+
+Coat::Persistent classes have the keyword B<has_p> to define persistent
+attributes. Attributes declared with B<has_p> are valid Coat attributes and
+take the same options as Coat's B<has> method. (Refer to L<Coat> for details).
+
+All attributes declared with B<has_p> must exist in the mapped data backend
+(they are a column of the table mapped to the class).
+
+=item B<owns_one $class>
+
+Tells that current class owns a subobject of the class $class. This will allow
+you to set and get a subobject transparently.
+
+The backend must have a foreign key to the table of $class.
+
+Example:
+
+    package Foo;
+    use Coat::Persistent;
+
+    owns_one 'Bar';
+
+    package Bar;
+    use Coat::Persistent;
+
+    my $foo = new Foo;
+    $foo->bar(new Bar);
+
+=item B<owns_many $class>
+
+This is the same as owns_one but says that many items are bound to one
+instance of the current class.
+
+The backend of class $class must provide a foreign key to the current class.
+
 =head1 SEE ALSO
+
+See L<Coat> for all the meta-class documentation.
 
 =head1 AUTHOR
 
-This module was written by Alexis Sukrieh E<lt>sukria+perl@sukria.netE<gt>
+This module was written by Alexis Sukrieh E<lt>sukria+perl@sukria.netE<gt>.
 
 =head1 COPYRIGHT AND LICENSE
 
