@@ -14,12 +14,14 @@ use base qw(Exporter);
 
 $AUTHORITY = 'cpan:SUKRIA';
 $VERSION   = '0.0_0.1';
-@EXPORT    = qw(has_p owns_one owns_many);
+@EXPORT    = qw(has_p 
+                owns_one owns_many);
 
 # Static method & stuff
 
 my $MAPPINGS = {};
 my $FIELDS   = {};
+my $UNIQUE   = {};
 
 sub mappings { $MAPPINGS }
 sub dbh { $MAPPINGS->{'!dbh'}{ $_[0] } || $MAPPINGS->{'!dbh'}{'!default'} }
@@ -86,6 +88,9 @@ sub has_p {
     my $caller = $options{'!caller'} || caller;
     confess "package main called has_p" if $caller eq 'main';
 
+    # unique field ?
+    $UNIQUE->{$caller}{$attr} = $options{unique} || 0;
+
     Coat::has( $attr, ( '!caller' => $caller, %options ) );
 
     my $finder = sub {
@@ -111,18 +116,37 @@ sub import {
     Coat::Persistent->export_to_level( 1, @_ );
 }
 
+# find() is a polymorphic method that can behaves in several ways accroding 
+# to the arguments passed.
+# There will be aliases for people who'd rather use specific methods ofr
+# specific behaviours.
+#
+# Class->find() : returns all rows (select * from class)
+# Class->find(12) : returns the row where id = 12
+# Class->find("condition") : returns the row(s) where condition
+# Class->find(["condition ?", $val]) returns the row(s) where condition
+
 sub find {
     my ( $class, $value ) = @_;
     confess "Cannot be called from an instance" if ref $class;
-    ( defined $value )
-      ? (
-        ( looks_like_number $value )
-        ? $class->find_by_id($value)
-        : $class->find_by_sql(
-            "select * from " . $class->_to_sql . " where " . $value
-        )
-      )
-      : $class->find_by_sql( "select * from " . $class->_to_sql );
+    if (defined $value) {
+        if (ref $value) {
+            confess "Cannot handle non-aray references" if ref($value) ne 'ARRAY';
+            my ($sql, @values) = @$value;
+            $class->find_by_sql("select * from "
+                              . $class->_to_sql
+                              . " where $sql", @values);
+        }
+        else {
+            ( looks_like_number $value )
+            ? $class->find_by_id($value)
+            : $class->find_by_sql("select * from ".$class->_to_sql." where $value");
+
+        }
+    }
+    else {
+       $class->find_by_sql( "select * from " . $class->_to_sql );
+    }
 }
 
 # let's you define a relation like A.b_id -> B
@@ -267,6 +291,23 @@ sub _next_id {
       : 1;
 }
 
+sub validate {
+    my ($self, @args) = @_;
+    my $class = ref($self);
+    
+    # checking for unique attributes
+    foreach my $attr (keys %{ Coat::Meta->all_attributes($class)} ) {
+        if ($UNIQUE->{$class}{$attr}) {
+            # look for other instances that already have that attribute
+            my @items = $class->find(["$attr = ?", $self->$attr]);
+            confess "Value ".$self->$attr." violates unique constraint "
+                  . "for attribute $attr (class $class)"
+                if @items;
+        }
+    }
+}
+
+
 # serialize the instance and save it with the mapper defined
 sub save {
     my ($self) = @_;
@@ -275,6 +316,9 @@ sub save {
 
     confess "Cannot save without a mapping defined for class " . ref $self
       unless defined $dbh;
+
+    # first call validate to check the object is sane
+    $self->validate();
 
     my $table = $self->_to_sql;
     my @values;
