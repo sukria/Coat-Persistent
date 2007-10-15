@@ -19,9 +19,8 @@ $VERSION   = '0.0_0.1';
 
 # Static method & stuff
 
-my $MAPPINGS = {};
-my $FIELDS   = {};
-my $UNIQUE   = {};
+my $MAPPINGS    = {};
+my $CONSTRAINTS = {};
 
 sub mappings { $MAPPINGS }
 sub dbh { $MAPPINGS->{'!dbh'}{ $_[0] } || $MAPPINGS->{'!dbh'}{'!default'} }
@@ -89,7 +88,9 @@ sub has_p {
     confess "package main called has_p" if $caller eq 'main';
 
     # unique field ?
-    $UNIQUE->{$caller}{$attr} = $options{unique} || 0;
+    $CONSTRAINTS->{'!unique'}{$caller}{$attr} = $options{unique} || 0;
+    # syntax check ?
+    $CONSTRAINTS->{'!syntax'}{$caller}{$attr} = $options{syntax} || undef;
 
     Coat::has( $attr, ( '!caller' => $caller, %options ) );
 
@@ -295,9 +296,16 @@ sub validate {
     my ($self, @args) = @_;
     my $class = ref($self);
     
-    # checking for unique attributes
     foreach my $attr (keys %{ Coat::Meta->all_attributes($class)} ) {
-        if ($UNIQUE->{$class}{$attr}) {
+        # checking for syntax validation
+        if (defined $CONSTRAINTS->{'!syntax'}{$class}{$attr}) {
+            my $regexp = $CONSTRAINTS->{'!syntax'}{$class}{$attr};
+            confess "Value \"".$self->$attr."\" for attribute \"$attr\" is not valid"
+                unless $self->$attr =~ /$regexp/;
+        }
+        
+        # checking for unique attributes
+        if ($CONSTRAINTS->{'!unique'}{$class}{$attr}) {
             # look for other instances that already have that attribute
             my @items = $class->find(["$attr = ?", $self->$attr]);
             confess "Value ".$self->$attr." violates unique constraint "
@@ -305,6 +313,7 @@ sub validate {
                 if @items;
         }
     }
+
 }
 
 
