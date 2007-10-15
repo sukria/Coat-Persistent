@@ -1,0 +1,9 @@
+
+Coat::MVC::Controller
+    [ ] has 'session'
+    [ ] has 'cookie'
+    [ ] Coat::MVC::Mailer
+    [X] params sanitizing ("" => undef)
+
+Coat::Persistent
+    [X] validate (default method called before save)
