@@ -21,6 +21,7 @@ $VERSION   = '0.0_0.1';
 
 my $MAPPINGS    = {};
 my $CONSTRAINTS = {};
+my $CACHE       = {};
 
 sub mappings { $MAPPINGS }
 sub dbh { $MAPPINGS->{'!dbh'}{ $_[0] } || $MAPPINGS->{'!dbh'}{'!default'} }
@@ -100,9 +101,33 @@ sub has_p {
         confess "Cannot find without a value" unless defined $value;
 
         my $table = $class->_to_sql;
-        $class->find_by_sql( "select * from $table where $attr = ?", $value );
+
+        if (wantarray) {
+            return @{ $CACHE->{$table}{$attr}{'array'}{$value} } 
+               if exists $CACHE->{$table}{$attr}{'array'}{$value};
+            my @objs = $class->find_by_sql("select * "
+                                         . "from $table where $attr = ?",
+                                         $value);
+            $CACHE->{$table}{$attr}{'array'}{$value} = \@objs;
+            return @objs;
+        }
+
+        else {
+            return $CACHE->{$table}{$attr}{'scalar'}{$value} 
+               if exists $CACHE->{$table}{$attr}{'scalar'}{$value};
+            my $obj = $class->find_by_sql("select * "
+                                         . "from $table where $attr = ?",
+                                         $value);
+            return $obj;
+        }
     };
     _bind_code_to_symbol( $finder, "${caller}::find_by_${attr}" );
+}
+
+sub clear_cache {
+    my($class) = @_;
+    my $table = $class->_to_sql;
+    delete $CACHE->{$table};
 }
 
 sub import {
@@ -304,8 +329,9 @@ sub validate {
                 unless $self->$attr =~ /$regexp/;
         }
         
-        # checking for unique attributes
-        if ($CONSTRAINTS->{'!unique'}{$class}{$attr}) {
+        # checking for unique attributes on inserting (new objects)
+        if ((! defined $self->id) && 
+            $CONSTRAINTS->{'!unique'}{$class}{$attr}) {
             # look for other instances that already have that attribute
             my @items = $class->find(["$attr = ?", $self->$attr]);
             confess "Value ".$self->$attr." violates unique constraint "
