@@ -9,8 +9,8 @@ BEGIN { use_ok 'Coat::Persistent' }
     use Coat;
     use Coat::Persistent;
 
-    owns_one  'Avatar';
-    owns_many 'Car';
+    has_one  'Avatar';
+    has_many 'Car';
 
     has_p 'name' => (isa => 'Str');
     has_p 'age' => (isa => 'Int');
@@ -25,7 +25,7 @@ BEGIN { use_ok 'Coat::Persistent' }
     use Coat;
     use Coat::Persistent;
 
-    owns_one 'Person';
+    has_one 'Person';
     has_p name => (isa => 'Str');
 }
 

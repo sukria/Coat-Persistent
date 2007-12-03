@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 18;
+use Test::More tests => 19;
 
 BEGIN { use_ok 'Coat::Persistent' }
 
@@ -50,6 +50,8 @@ $p = Person->find_by_name('Brenda');
 ok( defined $p, 'Person->find_by_name returned something' );
 isa_ok( $p, 'Person' );
 is( $p->name, $brenda->name, '$p is equal to $brenda' );
+
+ok( $brenda->delete, '$brenda->delete' );
 
 # remove the test db
 $dbh->do("DROP TABLE person");
