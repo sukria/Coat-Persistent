@@ -7,6 +7,7 @@ WriteMakefile(
         'Coat' => '0.1_0.6',
         'DBI'  => '0',
         'DBD::CSV' => '0',
+        'Cache::FastMmap' => 0,
     },
     ABSTRACT => 'Simple Object-Relational Mapper for Coat',
     test => {TESTS => join( ' ', glob( 't/*.t' ))},
