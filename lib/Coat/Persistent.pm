@@ -25,18 +25,19 @@ my $CONSTRAINTS = {};
 # static accessors
 sub mappings { $MAPPINGS }
 sub dbh { 
-    $MAPPINGS->{'!dbh'}{ $_[0] } || 
-    $MAPPINGS->{'!dbh'}{'!default'} 
+    $MAPPINGS->{'!dbh'}{ $_[0] }    || 
+    $MAPPINGS->{'!dbh'}{'!default'} ||
+    undef
 }
 sub driver {
-    $MAPPINGS->{'!driver'}{ $_[0] } || 
-    $MAPPINGS->{'!driver'}{'!default'};
+    $MAPPINGS->{'!driver'}{ $_[0] }    || 
+    $MAPPINGS->{'!driver'}{'!default'} ||
+    undef;
 }
-
 sub cache {
-    return defined $MAPPINGS->{'!cache'}{ $_[0] }
-        ? $MAPPINGS->{'!cache'}{ $_[0] }
-        : $MAPPINGS->{'!cache'}{'!default'};
+    $MAPPINGS->{'!cache'}{ $_[0] }    ||
+    $MAPPINGS->{'!cache'}{'!default'} || 
+    undef;
 }
 
 sub enable_cache {
