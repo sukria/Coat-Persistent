@@ -4,6 +4,7 @@ use Coat;
 use Coat::Meta;
 use Cache::FastMmap;
 use Scalar::Util qw(blessed looks_like_number);
+use List::Compare;
 use DBI;
 use DBD::CSV;
 use Carp 'confess';
@@ -102,21 +103,27 @@ sub find_by_sql {
     unless (@objects) {
         my $dbh = $class->dbh;
         my $sth = $dbh->prepare($sql);
-        $sth->execute(@values) or confess "Unable to execute query $sql";
+        $sth->execute(@values) or confess "Unable to execute query $sql : $!";
         my $rows = $sth->fetchall_arrayref( {} );
 
-        @objects = map {
-            my $obj = $class->new;
+        # if any rows, let's process them
+        if (@$rows) {
+            # we have to find out which fields are real attributes
+            my $class_attr = Coat::Meta->all_attributes( $class );
+            my @attrs = keys %$class_attr;
+            
+            # from the columns selected, where are real attributes and virtual ones?
+            my $lc = new List::Compare(\@attrs, [keys %{ $rows->[0] }]);
+            my @given_attr   = $lc->get_intersection;
+            my @virtual_attr = $lc->get_symdiff;
 
-            # column returned by the query that are valid attrs are set,
-            # other are set as virtual attr (without the accessor).
-            foreach my $attr ( keys %$_ ) {
-                Coat::Meta->has( $class, $attr )
-                  ? $obj->$attr( $_->{$attr} )
-                  : $obj->{$attr} = $_->{$attr};
+            # create the object with attributes, and set virtual ones
+            foreach my $r (@$rows) {
+                my $obj = $class->new(map { ($_ => $r->{$_}) } @given_attr);
+                $obj->{$_} = $r->{$_} for @virtual_attr;
+                push @objects, $obj;
             }
-            $obj;
-        } @$rows;
+        }
         
         # save to the cache if needed
         if (defined $class->cache) {
@@ -372,8 +379,8 @@ sub save {
 
         my $sth = $dbh->prepare($sql);
         $sth->execute(@values)
-          or confess "Unable to execute query : \"$sql\" with "
-          . join( ", ", @values ) . " : $!";
+          or confess "Unable to execute query : \"$sql\"  : [$!] with "
+          . join( ", ", @values );
         $self->_unlock;
     }
 
