@@ -80,7 +80,10 @@ sub map_to_dbi {
     my ( $table, $user, $pass ) = @options;
     $driver = $drivers->{$driver};
     $MAPPINGS->{'!dbh'}{$class} =
-      DBI->connect( "${driver}:${table}", $user, $pass );
+      DBI->connect( "${driver}:${table}", $user, $pass, { PrintError => 0, RaiseError => 0 });
+       
+    confess "Can't connect to database ${DBI::err} : ${DBI::errstr}"
+        unless $MAPPINGS->{'!dbh'}{$class};
 }
 
 
@@ -103,7 +106,9 @@ sub find_by_sql {
     unless (@objects) {
         my $dbh = $class->dbh;
         my $sth = $dbh->prepare($sql);
-        $sth->execute(@values) or confess "Unable to execute query $sql : $!";
+        $sth->execute(@values) 
+            or confess "Unable to execute query $sql : " . 
+               $DBI::err . ' : ' . $DBI::errstr;
         my $rows = $sth->fetchall_arrayref( {} );
 
         # if any rows, let's process them
