@@ -9,8 +9,7 @@ BEGIN { use_ok 'Coat::Persistent' }
     use Coat::Persistent;
 }
 
-#Coat::Persistent->map_to_dbi('csv', 'f_dir=./t/csv-test-database');
-Coat::Persistent->map_to_dbi('mysql', 'cp_test', 'root', '');
+Coat::Persistent->map_to_dbi('csv', 'f_dir=./t/csv-test-database');
 my $dbh = Foo->dbh;
 ok( defined $dbh, 'default dbh found' );
 $dbh->do("DROP TABLE dbix_sequence_state");
