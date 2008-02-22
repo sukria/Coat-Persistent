@@ -79,3 +79,5 @@ ok( $@, 'Cannot set something different from a Car to $p->cars ');
 $dbh->do("DROP TABLE person");
 $dbh->do("DROP TABLE avatar");
 $dbh->do("DROP TABLE car");
+$dbh->do("DROP TABLE dbix_sequence_state");
+$dbh->do("DROP TABLE dbix_sequence_release");

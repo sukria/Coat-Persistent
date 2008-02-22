@@ -12,7 +12,6 @@ BEGIN { use_ok 'Coat::Persistent' }
 }
 
 Person->map_to_dbi('csv', 'f_dir=./t/csv-test-database');
-# Person->map_to_dbi('mysql' => 'coat', 'dbuser' => 'dbpass');
 
 my $dbh = Person->dbh;
 $dbh->do("CREATE TABLE person (id INTEGER, name CHAR(64), age INTEGER)");
@@ -29,3 +28,5 @@ my $person = Person->find_by_age(20);
 isa_ok($person, 'Person', 'one Person returned in scalar context');
 
 $dbh->do("drop table person");
+$dbh->do("DROP TABLE dbix_sequence_state");
+$dbh->do("DROP TABLE dbix_sequence_release");

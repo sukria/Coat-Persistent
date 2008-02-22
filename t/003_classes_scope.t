@@ -26,3 +26,4 @@ my @b_expected = sort qw(id b);
 
 is_deeply(\@a_fields, \@a_expected, 'fields for A are good');
 is_deeply(\@b_fields, \@b_expected, 'fields for A are good');
+

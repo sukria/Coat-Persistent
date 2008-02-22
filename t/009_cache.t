@@ -41,3 +41,5 @@ $p3 = Person->find($p1->id);
 is($p1->name, $p3->name, '$p1 and $p3 are the same : name changed' );
 
 $dbh->do("DROP TABLE person");
+$dbh->do("DROP TABLE dbix_sequence_state");
+$dbh->do("DROP TABLE dbix_sequence_release");

@@ -30,3 +30,5 @@ ok( $p2->save, 'possible to save with name with letters and numbers');
 
 # clean
 $dbh->do("drop table person");
+$dbh->do("DROP TABLE dbix_sequence_state");
+$dbh->do("DROP TABLE dbix_sequence_release");
