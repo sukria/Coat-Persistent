@@ -23,7 +23,6 @@ foreach my $name ('Joe', 'John', 'Brenda') {
 }
 
 # tests
-
 my @people = Person->find_by_sql("select * from person where name like 'Jo%'");
 is(@people, 2, 'find_by_sql returned 2 objects');
 isa_ok($people[0], 'Person', 'first one');
