@@ -113,10 +113,9 @@ sub find_by_sql {
     my ( $class, $sql, @values ) = @_;
     my @objects;
 
-    my $cache_key = md5_base64($sql . (@values ? join(',', @values) : ''));
-
     # if cached, try to returned a cached value
     if (defined $class->cache) {
+        my $cache_key = md5_base64($sql . (@values ? join(',', @values) : ''));
         my $value = $class->cache->get($cache_key);
         @objects = @$value if defined $value;
     }
@@ -151,6 +150,7 @@ sub find_by_sql {
         
         # save to the cache if needed
         if (defined $class->cache) {
+            my $cache_key = md5_base64($sql . (@values ? join(',', @values) : ''));
             unless ($class->cache->set($cache_key, \@objects)) {
                 warn "Unable to write to cache for key : $cache_key ".
                      "; maybe upgrade the cache_size : $!";
@@ -213,7 +213,7 @@ sub find {
     confess "Cannot be called from an instance" if ref $class;
     if (defined $value) {
         if (ref $value) {
-            confess "Cannot handle non-aray references" if ref($value) ne 'ARRAY';
+            confess "Cannot handle non-array references" if ref($value) ne 'ARRAY';
             # we don't use SQL::Abstract there, because we have a SQL
             # statement with "?" and a list of values
             my ($sql, @values) = @$value;
@@ -370,40 +370,31 @@ sub save {
     $self->validate();
 
     my $table = $self->_to_sql;
-    my @values;
+    # all the attributes of the class
     my @fields = keys %{ Coat::Meta->all_attributes( ref $self ) };
+    # a hash containing attr/value pairs for the current object.
+    my %values = map { $_ => $self->$_ } @fields;
 
     # if we have an id, update
     if ( defined $self->id ) {
-        @values = map { $self->$_ } @fields;
-        my $sql =
-            "update $table set "
-          . join( ", ", map { "$_ = ?" } @fields )
-          . " where id = ?";
-
+        # generate the SQL
+        my ($sql, @values) = $sql_abstract->update($table, \%values, { id => $self->id});
+        # execute the query
         my $sth = $dbh->prepare($sql);
-        $sth->execute( @values, $self->id )
-          or confess "Unable to execute query \"$sql\" : $!";
+        $sth->execute( @values )
+          or confess "Unable to execute query \"$sql\" : $DBI::errstr";
     }
 
     # no id, insert with a valid id
     else {
+        # get our ID from the sequence
         $self->id( $self->_next_id );
-
-        my $sql =
-            "insert into $table ("
-          . ( join ", ", @fields )
-          . ") values ("
-          . ( join ", ", map { '?' } @fields ) . ")";
-
-        foreach my $field (@fields) {
-            push @values, $self->$field;
-        }
-
+        # generate the SQL
+        my ($sql, @values) = $sql_abstract->insert($table, { %values, id => $self->id });
+        # execute the query
         my $sth = $dbh->prepare($sql);
-        $sth->execute(@values)
-          or confess "Unable to execute query : \"$sql\"  : [$!] with "
-          . join( ", ", @values );
+        $sth->execute( @values )
+          or confess "Unable to execute query \"$sql\" : $DBI::errstr";
     }
 
     # if subobjects defined, save them
