@@ -68,6 +68,7 @@ sub disable_cache {
 }
 
 
+
 # This is the configration stuff, you basically bind a class to
 # a DBI driver
 sub map_to_dbi {
@@ -106,65 +107,18 @@ sub map_to_dbi {
 }
 
 
-
-# The generic SQL finder, takes a SQL query and map rows returned
-# to objects of the class
-sub find_by_sql {
-    my ( $class, $sql, @values ) = @_;
-    my @objects;
-
-    # if cached, try to returned a cached value
-    if (defined $class->cache) {
-        my $cache_key = md5_base64($sql . (@values ? join(',', @values) : ''));
-        my $value = $class->cache->get($cache_key);
-        @objects = @$value if defined $value;
-    }
-
-    # no cache found, perform the query
-    unless (@objects) {
-        my $dbh = $class->dbh;
-        my $sth = $dbh->prepare($sql);
-        $sth->execute(@values) 
-            or confess "Unable to execute query $sql : " . 
-               $DBI::err . ' : ' . $DBI::errstr;
-        my $rows = $sth->fetchall_arrayref( {} );
-
-        # if any rows, let's process them
-        if (@$rows) {
-            # we have to find out which fields are real attributes
-            my $class_attr = Coat::Meta->all_attributes( $class );
-            my @attrs = keys %$class_attr;
-            
-            # from the columns selected, where are real attributes and virtual ones?
-            my $lc = new List::Compare(\@attrs, [keys %{ $rows->[0] }]);
-            my @given_attr   = $lc->get_intersection;
-            my @virtual_attr = $lc->get_symdiff;
-
-            # create the object with attributes, and set virtual ones
-            foreach my $r (@$rows) {
-                my $obj = $class->new(map { ($_ => $r->{$_}) } @given_attr);
-                $obj->{$_} = $r->{$_} for @virtual_attr;
-                push @objects, $obj;
-            }
-        }
-        
-        # save to the cache if needed
-        if (defined $class->cache) {
-            my $cache_key = md5_base64($sql . (@values ? join(',', @values) : ''));
-            unless ($class->cache->set($cache_key, \@objects)) {
-                warn "Unable to write to cache for key : $cache_key ".
-                     "; maybe upgrade the cache_size : $!";
-            }
-        }
-    }
-
-    return wantarray
-      ? @objects
-      : $objects[0];
-}
-
 # This is done to wrap the original Coat::has method so we can
 # generate finders for each attribute declared
+# 
+# ActiveRecord chose to make attribute's finders dynamic, the functions are built
+# at runtime whenever they're called. In Perl this could have been done with 
+# AUTOLOAD, but that sucks. Doing that would mean crappy performance ;
+# defining the method in the package's namespace is far more efficient.
+#
+# The only case where I see AUTOLOAD is the good choice is for finders
+# made by mixing more than one attribute (find_by_foo_and_bar). 
+# Then, yes AUTOLOAD is a good choice, but for all the ones we know we need 
+# them, I disagree.
 sub has_p {
     my ( $attr, %options ) = @_;
     my $caller = $options{'!caller'} || caller;
@@ -177,7 +131,8 @@ sub has_p {
 
     Coat::has( $attr, ( '!caller' => $caller, %options ) );
 
-    my $finder = sub {
+    # find_by_
+    my $sub_find_by = sub {
         my ( $class, $value ) = @_;
         confess "Cannot be called from an instance" if ref $class;
         confess "Cannot find without a value" unless defined $value;
@@ -185,55 +140,52 @@ sub has_p {
         my ($sql, @values) = $sql_abstract->select($table, '*', {$attr => $value});
         return $class->find_by_sql($sql, @values);
     };
-    _bind_code_to_symbol( $finder, "${caller}::find_by_${attr}" );
-}
+    _bind_code_to_symbol( $sub_find_by, 
+                          "${caller}::find_by_${attr}" );
 
-sub import {
-    my $caller = caller;
-    return if $caller eq 'main';
-
-    # a Coat::Persistent object must have an id (this is the primary key)
-    has_p id => ( isa => 'Int', '!caller' => $caller );
-
-    # our caller inherits from Coat::Persistent
-    eval { Coat::_extends_class( ['Coat::Persistent'], $caller ) };
-    Coat::Persistent->export_to_level( 1, @_ );
-}
-
-# find() is a polymorphic method that can behaves in several ways accroding 
-# to the arguments passed.
-#
-# Class->find() : returns all rows (select * from class)
-# Class->find(12) : returns the row where id = 12
-# Class->find("condition") : returns the row(s) where condition
-# Class->find(["condition ?", $val]) returns the row(s) where condition
-
-sub find {
-    my ( $class, $value, @rest ) = @_;
-    confess "Cannot be called from an instance" if ref $class;
-
-    if (defined $value) {
-        if (ref $value) {
-            confess "Cannot handle non-array references" if ref($value) ne 'ARRAY';
-            # we don't use SQL::Abstract there, because we have a SQL
-            # statement with "?" and a list of values
-            my ($sql, @values) = @$value;
-            $class->find_by_sql("select * from "
-                              . $class->_to_sql
-                              . " where $sql", @values);
+    # find_or_create_by_
+    my $sub_find_or_create = sub {
+        # if 2 args : we're given the value of $attr only
+        if (@_ == 2) {
+            my ($class, $value) = @_;
+            my $obj = $class->find(["$attr = ?", $value]);
+            return $obj if defined $obj;
+            $class->create($attr => $value);
         }
-        # we don't have a list, so let's find out what's given 
+        # more than 2 args : this is a hash of attributes to look for
         else {
-            # the first item looks like a number (then it's an ID)
-            ( looks_like_number $value )
-            ?  $class->find_by_sql( $sql_abstract->select( $class->_to_sql, '*', { id => [$value, @rest] }) )
-            # else, it a user-defined SQL condition
-            : $class->find_by_sql($sql_abstract->select($class->_to_sql, '*', $value));
+            my ($class, %attrs) = @_;
+            confess "Cannot find_or_create_by_$attr without $attr" 
+                unless exists $attrs{$attr};
+            my $obj = $class->find(["$attr = ?", $attrs{$attr}]);
+            return $obj if defined $obj;
+            $class->create(%attrs);
         }
-    }
-    else {
-       $class->find_by_sql( $sql_abstract->select( $class->_to_sql, '*' ) );
-    }
+    };
+    _bind_code_to_symbol( $sub_find_or_create, 
+                          "${caller}::find_or_create_by_${attr}" );
+
+    # find_or_initialize_by_
+    my $sub_find_or_initialize = sub {
+        # if 2 args : we're given the value of $attr only
+        if (@_ == 2) {
+            my ($class, $value) = @_;
+            my $obj = $class->find(["$attr = ?", $value]);
+            return $obj if defined $obj;
+            $class->new($attr => $value);
+        }
+        # more than 2 args : this is a hash of attributes to look for
+        else {
+            my ($class, %attrs) = @_;
+            confess "Cannot find_or_initialize_by_$attr without $attr" 
+                unless exists $attrs{$attr};
+            my $obj = $class->find(["$attr = ?", $attrs{$attr}]);
+            return $obj if defined $obj;
+            $class->new(%attrs);
+        }
+    };
+    _bind_code_to_symbol( $sub_find_or_initialize, 
+                          "${caller}::find_or_initialize_by_${attr}" );
 }
 
 # let's you define a relation like A.b_id -> B
@@ -316,6 +268,139 @@ sub has_many {
     };
     _bind_code_to_symbol( $code, "${class}::${owned_class_sql}s" );
 }
+
+sub import {
+    my $caller = caller;
+    return if $caller eq 'main';
+
+    # a Coat::Persistent object must have an id (this is the primary key)
+    has_p id => ( isa => 'Int', '!caller' => $caller );
+
+    # our caller inherits from Coat::Persistent
+    eval { Coat::_extends_class( ['Coat::Persistent'], $caller ) };
+    Coat::Persistent->export_to_level( 1, @_ );
+}
+
+# find() is a polymorphic method that can behaves in several ways accroding 
+# to the arguments passed.
+#
+# Class->find() : returns all rows (select * from class)
+# Class->find(12) : returns the row where id = 12
+# Class->find("condition") : returns the row(s) where condition
+# Class->find(["condition ?", $val]) returns the row(s) where condition
+
+sub find {
+    # first of all, if the last arg is a HASH, its our options
+    # then, pop it to it's not processed anymore.
+    my %options;
+    %options = %{ pop @_ } 
+        if (defined $_[$#_] && ref($_[$#_]) eq 'HASH');
+
+    # then, fetch the args
+    my ( $class, $value, @rest ) = @_;
+    confess "Cannot be called from an instance" if ref $class;
+
+    # handling of the options given
+    my $select = $options{'select'} || '*';
+    my $from   = $options{'from'}   || $class->_to_sql;
+    my $group  = "GROUP BY " . $options{group} if defined $options{group};
+    my $order  = "ORDER BY " . $options{order} if defined $options{order};
+    my $limit  = "LIMIT "    . $options{limit} if defined $options{limit};
+    
+    # now building the sql tail of our future query
+    my $tail = " ";
+    $tail   .= "$group " if defined $group;
+    $tail   .= "$order " if defined $order;
+    $tail   .= "$limit " if defined $limit;
+
+    if (defined $value) {
+        if (ref $value) {
+            confess "Cannot handle non-array references" if ref($value) ne 'ARRAY';
+            # we don't use SQL::Abstract there, because we have a SQL
+            # statement with "?" and a list of values
+            my ($sql, @values) = @$value;
+            $class->find_by_sql(
+                "select $select from $from where $sql $tail", @values);
+        }
+        # we don't have a list, so let's find out what's given 
+        else {
+            # the first item looks like a number (then it's an ID)
+            if (looks_like_number $value) {
+                my ($sql, @values) = $sql_abstract->select( 
+                                        $from, 
+                                        $select, 
+                                        { id => [$value, @rest] });
+                return $class->find_by_sql($sql.$tail, @values);
+            }
+            # else, it a user-defined SQL condition
+            else {
+                my ($sql, @values) = $sql_abstract->select($from, $select, $value);
+                $class->find_by_sql($sql.$tail, @values);
+            }
+        }
+    }
+    else {
+       $class->find_by_sql( $sql_abstract->select( $from, $select ).$tail);
+    }
+}
+
+# The generic SQL finder, takes a SQL query and map rows returned
+# to objects of the class
+sub find_by_sql {
+    my ( $class, $sql, @values ) = @_;
+    my @objects;
+    warn "find_by_sql\n\tsql: $sql\n\tval: @values\n";
+
+    # if cached, try to returned a cached value
+    if (defined $class->cache) {
+        my $cache_key = md5_base64($sql . (@values ? join(',', @values) : ''));
+        my $value = $class->cache->get($cache_key);
+        @objects = @$value if defined $value;
+    }
+
+    # no cache found, perform the query
+    unless (@objects) {
+        my $dbh = $class->dbh;
+        my $sth = $dbh->prepare($sql);
+        $sth->execute(@values) 
+            or confess "Unable to execute query $sql : " . 
+               $DBI::err . ' : ' . $DBI::errstr;
+        my $rows = $sth->fetchall_arrayref( {} );
+
+        # if any rows, let's process them
+        if (@$rows) {
+            # we have to find out which fields are real attributes
+            my $class_attr = Coat::Meta->all_attributes( $class );
+            my @attrs = keys %$class_attr;
+            
+            # from the columns selected, where are real attributes and virtual ones?
+            my $lc = new List::Compare(\@attrs, [keys %{ $rows->[0] }]);
+            my @given_attr   = $lc->get_intersection;
+            my @virtual_attr = $lc->get_symdiff;
+
+            # create the object with attributes, and set virtual ones
+            foreach my $r (@$rows) {
+                my $obj = $class->new(map { ($_ => $r->{$_}) } @given_attr);
+                $obj->{$_} = $r->{$_} for @virtual_attr;
+                push @objects, $obj;
+            }
+        }
+        
+        # save to the cache if needed
+        if (defined $class->cache) {
+            my $cache_key = md5_base64($sql . (@values ? join(',', @values) : ''));
+            unless ($class->cache->set($cache_key, \@objects)) {
+                warn "Unable to write to cache for key : $cache_key ".
+                     "; maybe upgrade the cache_size : $!";
+            }
+        }
+    }
+
+    return wantarray
+      ? @objects
+      : $objects[0];
+}
+
 
 sub validate {
     my ($self, @args) = @_;
@@ -722,11 +807,11 @@ Those methods must be called in class-context.
 
 =over 4 
 
-=item B<find( @conditions )>
+=item B<find( @conditions, \%options )>
 
 Find operates with three different retrieval approaches:
 
-=over 8
+=over 4
 
 =item I<Find by id>: This can either be a specific id or a list of ids (1, 5,
 6)
@@ -738,12 +823,38 @@ order. If no record can be matched, undef is returned.
 =item I<Find in list context>: This will return all the records matched by the
 options used. If no records are found, an empty array is returned.
 
-Example:
+=back
+
+The following options are supported :
+
+=over 4
+
+=item B<select>: By default, this is * as in SELECT * FROM, but can be
+changed.
+
+=item B<from>: By default, this is the table name of the class, but can be changed
+to an alternate table name (or even the name of a database view). 
+
+=item B<order>: An SQL fragment like "created_at DESC, name".
+
+=item B<group>: An attribute name by which the result should be grouped. 
+Uses the GROUP BY SQL-clause.
+
+=item B<limit>: An integer determining the limit on the number of rows that should
+be returned.
+
+=back
+
+Examples without options:
 
     my $obj = Class->find(23);
     my @list = Class->find(1, 23, 34, 54);
     my $obj = Class->find("field = 'value'");
     my $obj = Class->find(["field = ?", $value]);
+
+Example with options:
+
+    my @list = Class->find($condition, { order => 'field1 desc' })
 
 =back
 

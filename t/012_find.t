@@ -33,6 +33,24 @@ ok( defined $brenda, 'defined $brenda' );
 ok( defined $dave, 'defined $dave' );
 ok( defined $nate, 'defined $nate' );
 
+# find() with options...
+
+# order
+my @sorted_names = sort qw(Brenda Nate Dave);
+my @people = Person->find({ order => 'name' });
+is( 3, @people, '3 people returned' );
+is_deeply (\@sorted_names, [ map { $_->name } @people], 'names are sorted');
+
+# limit
+my @people = Person->find(["id > ?", 0], { limit => 2, order => 'name' });
+is( 2, @people, '2 people returned' );
+
+# select
+my $brend = Person->find("name = 'Brenda'", {select => 'name'});
+ok( defined $brend, '$brend defined');
+is( 'Brenda', $brend->name, 'name is set' );
+ok( ! defined $brend->age, 'age is not set' );
+
 # remove the test db
 $dbh->do("DROP TABLE person");
 $dbh->do("DROP TABLE dbix_sequence_state");
