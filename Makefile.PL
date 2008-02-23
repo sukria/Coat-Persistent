@@ -10,6 +10,6 @@ WriteMakefile(
         'SQL::Abstract' => 0,
         'List::Compare' => 0,
     },
-    ABSTRACT => 'Simple Object-Relational Mapper for Coat',
+    ABSTRACT => "Ruby's ActiveRecord::Base portage for Perl (ORM)",
     test => {TESTS => join( ' ', glob( 't/*.t' ))},
 );
