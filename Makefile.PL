@@ -10,6 +10,6 @@ WriteMakefile(
         'SQL::Abstract' => 0,
         'List::Compare' => 0,
     },
-    ABSTRACT => "Ruby's ActiveRecord::Base portage for Perl (ORM)",
+    ABSTRACT => "Ruby's ActiveRecord::Base port for Perl (ORM)",
     test => {TESTS => join( ' ', glob( 't/*.t' ))},
 );
