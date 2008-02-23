@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 4;
+use Test::More tests => 10;
 
 BEGIN { use_ok 'Coat::Persistent' }
 
@@ -42,7 +42,7 @@ is( 3, @people, '3 people returned' );
 is_deeply (\@sorted_names, [ map { $_->name } @people], 'names are sorted');
 
 # limit
-my @people = Person->find(["id > ?", 0], { limit => 2, order => 'name' });
+@people = Person->find(["id > ?", 0], { limit => 2, order => 'name' });
 is( 2, @people, '2 people returned' );
 
 # select
