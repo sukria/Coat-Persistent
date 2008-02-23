@@ -349,7 +349,7 @@ sub find {
 sub find_by_sql {
     my ( $class, $sql, @values ) = @_;
     my @objects;
-    warn "find_by_sql\n\tsql: $sql\n\tval: @values\n";
+    #warn "find_by_sql\n\tsql: $sql\n\tval: @values\n";
 
     # if cached, try to returned a cached value
     if (defined $class->cache) {
