@@ -14,7 +14,7 @@ use vars qw($VERSION @EXPORT $AUTHORITY);
 use base qw(Exporter);
 
 # Module meta-data
-$VERSION   = '0.0_0.3';
+$VERSION   = '0.0_0.4';
 $AUTHORITY = 'cpan:SUKRIA';
 @EXPORT    = qw(has_p has_one has_many);
 
