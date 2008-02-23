@@ -67,8 +67,6 @@ sub disable_cache {
     undef $MAPPINGS->{'!cache'}{$class};
 }
 
-
-
 # This is the configration stuff, you basically bind a class to
 # a DBI driver
 sub map_to_dbi {
@@ -288,10 +286,13 @@ sub import {
 # Class->find(12) : returns the row where id = 12
 # Class->find("condition") : returns the row(s) where condition
 # Class->find(["condition ?", $val]) returns the row(s) where condition
+#
+# You can also pass an as your last argument, this will be the options
+# Class->find(..., \%options) 
 
 sub find {
     # first of all, if the last arg is a HASH, its our options
-    # then, pop it to it's not processed anymore.
+    # then, pop it so it's not processed anymore.
     my %options;
     %options = %{ pop @_ } 
         if (defined $_[$#_] && ref($_[$#_]) eq 'HASH');
