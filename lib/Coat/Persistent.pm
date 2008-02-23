@@ -6,17 +6,20 @@ use Scalar::Util qw(blessed looks_like_number);
 use List::Compare;
 use DBI;
 use DBIx::Sequence;
+use SQL::Abstract;
 use Carp 'confess';
 use Digest::MD5 qw(md5_base64);
 
 use vars qw($VERSION @EXPORT $AUTHORITY);
 use base qw(Exporter);
 
+# Module meta-data
 $VERSION   = '0.0_0.3';
 $AUTHORITY = 'cpan:SUKRIA';
 @EXPORT    = qw(has_p has_one has_many);
 
-# Static method & stuff
+# The SQL::Abstract object
+my $sql_abstract = SQL::Abstract->new;
 
 # configuration place-holders
 my $MAPPINGS    = {};
@@ -178,10 +181,9 @@ sub has_p {
         my ( $class, $value ) = @_;
         confess "Cannot be called from an instance" if ref $class;
         confess "Cannot find without a value" unless defined $value;
-
         my $table = $class->_to_sql;
-
-        return $class->find_by_sql("select * from $table where $attr = ?", $value);
+        my ($sql, @values) = $sql_abstract->select($table, '*', {$attr => $value});
+        return $class->find_by_sql($sql, @values);
     };
     _bind_code_to_symbol( $finder, "${caller}::find_by_${attr}" );
 }
@@ -212,6 +214,8 @@ sub find {
     if (defined $value) {
         if (ref $value) {
             confess "Cannot handle non-aray references" if ref($value) ne 'ARRAY';
+            # we don't use SQL::Abstract there, because we have a SQL
+            # statement with "?" and a list of values
             my ($sql, @values) = @$value;
             $class->find_by_sql("select * from "
                               . $class->_to_sql
@@ -220,12 +224,11 @@ sub find {
         else {
             ( looks_like_number $value )
             ? $class->find_by_id($value)
-            : $class->find_by_sql("select * from ".$class->_to_sql." where $value");
-
+            : $class->find_by_sql($sql_abstract->select($class->_to_sql, '*', $value));
         }
     }
     else {
-       $class->find_by_sql( "select * from " . $class->_to_sql );
+       $class->find_by_sql( $sql_abstract->select( $class->_to_sql, '*' ) );
     }
 }
 
@@ -416,6 +419,7 @@ sub save {
 
 ##############################################################################
 # Private methods
+
 
 # instance method & stuff
 sub _bind_code_to_symbol {
