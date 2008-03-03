@@ -1,20 +1,26 @@
 package Coat::Persistent;
 
+# Coat & friends
 use Coat;
 use Coat::Meta;
+use Coat::Persistent::Meta;
+use Carp 'confess';
+
+# Low-level helpers
+use Digest::MD5 qw(md5_base64);
 use Scalar::Util qw(blessed looks_like_number);
 use List::Compare;
+
+# DBI & SQL related
 use DBI;
 use DBIx::Sequence;
 use SQL::Abstract;
-use Carp 'confess';
-use Digest::MD5 qw(md5_base64);
 
+# Module meta-data
 use vars qw($VERSION @EXPORT $AUTHORITY);
 use base qw(Exporter);
 
-# Module meta-data
-$VERSION   = '0.0_0.5';
+$VERSION   = '1.0_1';
 $AUTHORITY = 'cpan:SUKRIA';
 @EXPORT    = qw(has_p has_one has_many);
 
@@ -110,7 +116,7 @@ sub map_to_dbi {
 # 
 # ActiveRecord chose to make attribute's finders dynamic, the functions are built
 # at runtime whenever they're called. In Perl this could have been done with 
-# AUTOLOAD, but that sucks. Doing that would mean crappy performance ;
+# AUTOLOAD, but that sucks. Doing that would mean crappy performances;
 # defining the method in the package's namespace is far more efficient.
 #
 # The only case where I see AUTOLOAD is the good choice is for finders
@@ -134,7 +140,7 @@ sub has_p {
         my ( $class, $value ) = @_;
         confess "Cannot be called from an instance" if ref $class;
         confess "Cannot find without a value" unless defined $value;
-        my $table = $class->_to_sql;
+        my $table = Coat::Persistent::Meta->table_name($class);
         my ($sql, @values) = $sql_abstract->select($table, '*', {$attr => $value});
         return $class->find_by_sql($sql, @values);
     };
@@ -202,20 +208,22 @@ sub has_p {
 sub has_one {
     my ($owned_class)   = @_;
     my $class           = caller;
-    my $owned_class_sql = _to_sql($owned_class);
+
+    my $owned_table_name  = Coat::Persistent::Meta->table_name($owned_class);
+    my $owned_primary_key = Coat::Persistent::Meta->primary_key($owned_class);
 
     # record the foreign key
-    my $foreign_key = "${owned_class_sql}_id";
+    my $foreign_key = $owned_table_name . '_' . $owned_primary_key;
     has_p $foreign_key => ( isa => 'Int', '!caller' => $class );
 
-    my $symbol = "${class}::${owned_class_sql}";
+    my $symbol = "${class}::${owned_table_name}";
     my $code   = sub {
         my ( $self, $object ) = @_;
 
         # want to set the subobject
         if ( @_ == 2 ) {
             if ( defined $object ) {
-                $self->$foreign_key( $object->id );
+                $self->$foreign_key( $object->$owned_primary_key );
             }
             else {
                 $self->$foreign_key(undef);
@@ -238,45 +246,71 @@ sub has_one {
 sub has_many {
     my ($owned_class)   = @_;
     my $class           = caller;
-    my $class_sql       = _to_sql($class);
-    my $owned_class_sql = _to_sql($owned_class);
+    
+    # get the SQL table names and primary keys we need 
+    my $table_name        = Coat::Persistent::Meta->table_name($class);
+    my $primary_key       = Coat::Persistent::Meta->primary_key($class);
+    my $owned_table_name  = Coat::Persistent::Meta->table_name($owned_class);
+    my $owned_primary_key = Coat::Persistent::Meta->primary_key($owned_class);
 
+    # FIXME : have to pluralize properly and let the user
+    # disable the pluralisation.
     # the accessor : $obj->things for subobject "Thing"
     my $code = sub {
         my ( $self, @list ) = @_;
 
         # a get
         if ( @_ == 1 ) {
-            my $accessor = "find_by_${class_sql}_id";
-            return $owned_class->$accessor( $self->id );
+            my $accessor = "find_by_${table_name}_${primary_key}";
+            return $owned_class->$accessor( $self->$primary_key );
         }
 
         # a set
         else {
             foreach my $obj (@list) {
+                # is the object made of something appropriate?
                 confess "Not an object reference, expected $owned_class"
                   unless defined blessed $obj;
                 confess "Not an object of class $owned_class (got "
                   . blessed($obj) . ")"
                   unless blessed $obj eq $owned_class;
-                $obj->$class_sql($self);
+                # then set 
+                $obj->$table_name($self);
                 push @{ $self->{_subobjects} }, $obj;
             }
         }
     };
-    _bind_code_to_symbol( $code, "${class}::${owned_class_sql}s" );
+    _bind_code_to_symbol( $code, "${class}::${owned_table_name}s" );
 }
 
+# When Coat::Persistent is imported, a couple of actions have to be 
+# done. Mostly: declare the default primary key of the model, the table
+# name it maps.
 sub import {
+    my ($class, @stuff) = @_;
+    my %options;
+    %options = @stuff if @stuff % 2 == 0;
+
+    # Don't do our automagick inheritance if main is calling us
     my $caller = caller;
     return if $caller eq 'main';
-
-    # a Coat::Persistent object must have an id (this is the primary key)
-    has_p id => ( isa => 'Int', '!caller' => $caller );
-
-    # our caller inherits from Coat::Persistent
+    
+    # now, our caller inherits from Coat::Persistent
     eval { Coat::_extends_class( ['Coat::Persistent'], $caller ) };
-    Coat::Persistent->export_to_level( 1, @_ );
+
+    # default values for mapping rules
+    $options{primary_key} ||= 'id';
+    $options{table_name}  ||= $caller->_to_sql;
+
+    # save the meta information obout the model mapping
+    Coat::Persistent::Meta->table_name($caller, $options{table_name});
+    Coat::Persistent::Meta->primary_key($caller, $options{primary_key});
+
+    # a Coat::Persistent object must have a the primary key)
+    has_p $options{primary_key} => ( isa => 'Int', '!caller' => $caller );
+
+    # we have a couple of symbols to export outside
+    Coat::Persistent->export_to_level( 1, ($class, @EXPORT) );
 }
 
 # find() is a polymorphic method that can behaves in several ways accroding 
@@ -301,12 +335,17 @@ sub find {
     my ( $class, $value, @rest ) = @_;
     confess "Cannot be called from an instance" if ref $class;
 
+    # get the corresponfing SQL names
+    my $primary_key = Coat::Persistent::Meta->primary_key($class);
+    my $table_name  = Coat::Persistent::Meta->table_name($class);
+
     # handling of the options given
     my $select = $options{'select'} || '*';
-    my $from   = $options{'from'}   || $class->_to_sql;
+    my $from   = $options{'from'}   || $table_name;
     my $group  = "GROUP BY " . $options{group} if defined $options{group};
     my $order  = "ORDER BY " . $options{order} if defined $options{order};
     my $limit  = "LIMIT "    . $options{limit} if defined $options{limit};
+
     
     # now building the sql tail of our future query
     my $tail = " ";
@@ -330,7 +369,7 @@ sub find {
                 my ($sql, @values) = $sql_abstract->select( 
                                         $from, 
                                         $select, 
-                                        { id => [$value, @rest] });
+                                        { $primary_key => [$value, @rest] });
                 return $class->find_by_sql($sql.$tail, @values);
             }
             # else, it a user-defined SQL condition
@@ -350,7 +389,7 @@ sub find {
 sub find_by_sql {
     my ( $class, $sql, @values ) = @_;
     my @objects;
-    #warn "find_by_sql\n\tsql: $sql\n\tval: @values\n";
+#    warn "find_by_sql\n\tsql: $sql\n\tval: @values\n";
 
     # if cached, try to returned a cached value
     if (defined $class->cache) {
@@ -406,6 +445,8 @@ sub find_by_sql {
 sub validate {
     my ($self, @args) = @_;
     my $class = ref($self);
+    my $table_name  = Coat::Persistent::Meta->table_name($class);
+    my $primary_key = Coat::Persistent::Meta->primary_key($class);
     
     foreach my $attr (keys %{ Coat::Meta->all_attributes($class)} ) {
         # checking for syntax validation
@@ -416,7 +457,7 @@ sub validate {
         }
         
         # checking for unique attributes on inserting (new objects)
-        if ((! defined $self->id) && 
+        if ((! defined $self->$primary_key) && 
             $CONSTRAINTS->{'!unique'}{$class}{$attr}) {
             # look for other instances that already have that attribute
             my @items = $class->find(["$attr = ?", $self->$attr]);
@@ -432,6 +473,8 @@ sub delete {
     my ($self, $id) = @_;
     my $class  = ref $self || $self;
     my $dbh    = $class->dbh;
+    my $table_name  = Coat::Persistent::Meta->table_name($class);
+    my $primary_key = Coat::Persistent::Meta->primary_key($class);
 
     confess "Cannot delete without an id" 
         if (!ref $self && !defined $id);
@@ -439,12 +482,15 @@ sub delete {
     confess "Cannot delete without a mapping defined for class " . ref $self
       unless defined $dbh;
 
-    $id = $self->id if ref($self);
+    # if the argument given is an object, fetch its id
+    $id = $self->$primary_key if ref($self);
 
+    # at this, point, we must have an id
     confess "Cannot delete without a defined id" 
         unless defined $id;
 
-    $dbh->do("delete from ".$class->_to_sql." where id = $id");
+    # delete the stuff
+    $dbh->do("delete from ".$table_name." where $primary_key = $id");
 }
 
 # create is an alias for new + save, it can hande simple 
@@ -472,6 +518,9 @@ sub save {
     my ($self) = @_;
     my $class  = ref $self;
     my $dbh    = $class->dbh;
+    my $table_name  = Coat::Persistent::Meta->table_name($class);
+    my $primary_key = Coat::Persistent::Meta->primary_key($class);
+#    warn "save\n\ttable_name: $table_name\n\tprimary_key: $primary_key\n";
 
     confess "Cannot save without a mapping defined for class " . ref $self
       unless defined $dbh;
@@ -479,16 +528,16 @@ sub save {
     # first call validate to check the object is sane
     $self->validate();
 
-    my $table = $self->_to_sql;
     # all the attributes of the class
     my @fields = keys %{ Coat::Meta->all_attributes( ref $self ) };
     # a hash containing attr/value pairs for the current object.
     my %values = map { $_ => $self->$_ } @fields;
 
     # if we have an id, update
-    if ( defined $self->id ) {
+    if ( defined $self->$primary_key ) {
         # generate the SQL
-        my ($sql, @values) = $sql_abstract->update($table, \%values, { id => $self->id});
+        my ($sql, @values) = $sql_abstract->update(
+            $table_name, \%values, { $primary_key => $self->$primary_key});
         # execute the query
         my $sth = $dbh->prepare($sql);
         $sth->execute( @values )
@@ -498,9 +547,12 @@ sub save {
     # no id, insert with a valid id
     else {
         # get our ID from the sequence
-        $self->id( $self->_next_id );
+        $self->$primary_key( $self->_next_id );
+
         # generate the SQL
-        my ($sql, @values) = $sql_abstract->insert($table, { %values, id => $self->id });
+        my ($sql, @values) = $sql_abstract->insert(
+            $table_name, { %values, $primary_key => $self->$primary_key });
+
         # execute the query
         my $sth = $dbh->prepare($sql);
         $sth->execute( @values )
@@ -514,7 +566,7 @@ sub save {
         }
         delete $self->{_subobjects};
     }
-    return $self->id;
+    return $self->$primary_key;
 }
 
 
@@ -536,6 +588,8 @@ sub _to_class {
     join '::', map { ucfirst $_ } split '_', $_[0];
 }
 
+# Takes a classname and translates it into a database table name.
+# Ex: Class::Foo -> class_foo
 sub _to_sql {
     my $table = ( ref $_[0] ) ? lc ref $_[0] : lc $_[0];
     $table =~ s/::/_/g;
@@ -548,7 +602,7 @@ sub _lock_write {
     return 1 if $class->driver ne 'mysql';
 
     my $dbh   = $class->dbh;
-    my $table = $self->_to_sql;
+    my $table = Coat::Persistent::Meta->table_name($class);
     $dbh->do("LOCK TABLE $table WRITE")
       or confess "Unable to lock table $table";
 }
@@ -567,7 +621,7 @@ sub _next_id {
     my ($self) = @_;
     my $class = ref $self;
     
-    my $table = $self->_to_sql;
+    my $table = Coat::Persistent::Meta->table_name($class);
     my $dbh   = $class->dbh;
 
     my $sequence = new DBIx::Sequence({ dbh => $dbh });
@@ -652,16 +706,32 @@ environment.
 
 =head1 DATA BACKEND
 
-The concept behing this module is the same behind the ORM of Rails : all your
-tables must have a primary key named B<id>. This may become configurable in
-future versions, but in this developer release this is not.
+The concept behing this module is the same behind the ORM of Rails : there are
+conventions that tell how to translate a model meta-information into a SQL
+one :
 
-Your table names must be named like the package they map, with the following
+The conventions implemented in Coat::Persistent are the following:
+
+=over 4
+
+=item The primary key of the tables mapped should be named 'id'.
+
+=item Your table names must be named like the package they map, with the following
 rules applied : lower case, replace "::" by "_". For instance a class Foo::Bar
 should be mapped to a table named "foo_bar".
 
-All foreign key must be named "<table>_id" where table is the name if the
+=item All foreign keys must be named "<table>_id" where table is the name if the
 class mapped formated like said above.
+
+=back
+
+You can overide those conventions at import time:
+
+    package My::Model;
+    use Coat;
+    use Coat::Persistent 
+            table_name  => 'mymodel', # default would be 'my_model'
+            primary_key => 'mid';     # default would be 'id'
 
 =head1 CONFIGURATION
 
