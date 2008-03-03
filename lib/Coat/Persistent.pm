@@ -20,7 +20,7 @@ use SQL::Abstract;
 use vars qw($VERSION @EXPORT $AUTHORITY);
 use base qw(Exporter);
 
-$VERSION   = '1.0_1';
+$VERSION   = '0.9_6';
 $AUTHORITY = 'cpan:SUKRIA';
 @EXPORT    = qw(has_p has_one has_many);
 
