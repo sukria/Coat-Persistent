@@ -421,6 +421,7 @@ sub find_by_sql {
             # create the object with attributes, and set virtual ones
             foreach my $r (@$rows) {
                 my $obj = $class->new(map { ($_ => $r->{$_}) } @given_attr);
+                $obj->init_on_find();
                 $obj->{$_} = $r->{$_} for @virtual_attr;
                 push @objects, $obj;
             }
@@ -441,6 +442,9 @@ sub find_by_sql {
       : $objects[0];
 }
 
+
+sub init_on_find {
+}
 
 sub validate {
     my ($self, @args) = @_;
