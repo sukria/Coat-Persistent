@@ -206,17 +206,20 @@ sub has_p {
 # TODO : later let the user override the bindings
 
 sub has_one {
-    my ($owned_class)   = @_;
-    my $class           = caller;
+    my ($name, %options) = @_;
+    my $class = caller;
 
+    my $owned_class       = $options{class_name} || $name;
     my $owned_table_name  = Coat::Persistent::Meta->table_name($owned_class);
     my $owned_primary_key = Coat::Persistent::Meta->primary_key($owned_class);
+    
+    my $attr_name = (defined $options{class_name}) ? $name : $owned_table_name ;
 
     # record the foreign key
     my $foreign_key = $owned_table_name . '_' . $owned_primary_key;
     has_p $foreign_key => ( isa => 'Int', '!caller' => $class );
 
-    my $symbol = "${class}::${owned_table_name}";
+    my $symbol = "${class}::${attr_name}";
     my $code   = sub {
         my ( $self, $object ) = @_;
 
@@ -244,9 +247,11 @@ sub has_one {
 #     $a->bs returns B->find_by_a_id($a->id)
 # * B must provide a 'has_one A' statement for this to work
 sub has_many {
-    my ($owned_class)   = @_;
-    my $class           = caller;
-    
+    my ($owned_class, %rules)   = @_;
+    my $class = caller;
+
+    $owned_class = $rules{class_name} if defined $rules{class_name};
+
     # get the SQL table names and primary keys we need 
     my $table_name        = Coat::Persistent::Meta->table_name($class);
     my $primary_key       = Coat::Persistent::Meta->primary_key($class);
@@ -581,6 +586,7 @@ sub save {
 # instance method & stuff
 sub _bind_code_to_symbol {
     my ( $code, $symbol ) = @_;
+
     {
         no strict 'refs';
         no warnings 'redefine', 'prototype';
