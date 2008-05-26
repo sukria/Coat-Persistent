@@ -240,6 +240,9 @@ sub has_one {
         }
     };
     _bind_code_to_symbol( $code, $symbol );
+
+    # save the accessor defined for that subobject
+    Coat::Persistent::Meta->accessor( $class => $attr_name );
 }
 
 # many relations means an instance of class A owns many instances
@@ -247,16 +250,20 @@ sub has_one {
 #     $a->bs returns B->find_by_a_id($a->id)
 # * B must provide a 'has_one A' statement for this to work
 sub has_many {
-    my ($owned_class, %rules)   = @_;
+    my ($name, %options)   = @_;
     my $class = caller;
 
-    $owned_class = $rules{class_name} if defined $rules{class_name};
+    my $owned_class       = $options{class_name} || $name;
 
     # get the SQL table names and primary keys we need 
     my $table_name        = Coat::Persistent::Meta->table_name($class);
     my $primary_key       = Coat::Persistent::Meta->primary_key($class);
     my $owned_table_name  = Coat::Persistent::Meta->table_name($owned_class);
     my $owned_primary_key = Coat::Persistent::Meta->primary_key($owned_class);
+    
+    my $attr_name = (defined $options{class_name}) 
+                  ? $name 
+                  : $owned_table_name.'s' ;
 
     # FIXME : have to pluralize properly and let the user
     # disable the pluralisation.
@@ -274,18 +281,21 @@ sub has_many {
         else {
             foreach my $obj (@list) {
                 # is the object made of something appropriate?
-                confess "Not an object reference, expected $owned_class"
+                confess "Not an object reference, expected $owned_class, got ($obj)"
                   unless defined blessed $obj;
                 confess "Not an object of class $owned_class (got "
                   . blessed($obj) . ")"
                   unless blessed $obj eq $owned_class;
+                
                 # then set 
-                $obj->$table_name($self);
+                my $accessor = Coat::Persistent::Meta->accessor( $owned_class) || $table_name;
+                $obj->$accessor($self);
                 push @{ $self->{_subobjects} }, $obj;
             }
+            return scalar(@list) == scalar(@{$self->{_subobjects}});
         }
     };
-    _bind_code_to_symbol( $code, "${class}::${owned_table_name}s" );
+    _bind_code_to_symbol( $code, "${class}::${attr_name}" );
 }
 
 # When Coat::Persistent is imported, a couple of actions have to be 
@@ -529,7 +539,7 @@ sub save {
     my $dbh    = $class->dbh;
     my $table_name  = Coat::Persistent::Meta->table_name($class);
     my $primary_key = Coat::Persistent::Meta->primary_key($class);
-#    warn "save\n\ttable_name: $table_name\n\tprimary_key: $primary_key\n";
+    #warn "save\n\ttable_name: $table_name\n\tprimary_key: $primary_key\n";
 
     confess "Cannot save without a mapping defined for class " . ref $self
       unless defined $dbh;
@@ -563,6 +573,7 @@ sub save {
             $table_name, { %values, $primary_key => $self->$primary_key });
 
         # execute the query
+        #warn "sql: $sql ".join(', ', @values);
         my $sth = $dbh->prepare($sql);
         $sth->execute( @values )
           or confess "Unable to execute query \"$sql\" : $DBI::errstr";
