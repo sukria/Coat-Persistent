@@ -20,7 +20,7 @@ use SQL::Abstract;
 use vars qw($VERSION @EXPORT $AUTHORITY);
 use base qw(Exporter);
 
-$VERSION   = '0.9_6';
+$VERSION   = '0.100';
 $AUTHORITY = 'cpan:SUKRIA';
 @EXPORT    = qw(has_p has_one has_many);
 
@@ -306,9 +306,11 @@ sub import {
     my %options;
     %options = @stuff if @stuff % 2 == 0;
 
-    # Don't do our automagick inheritance if main is calling us
+    # Don't do our automagick inheritance if main is calling us or if the
+    # class has already been registered
     my $caller = caller;
     return if $caller eq 'main';
+    return if defined Coat::Persistent::Meta->registry( $class );
     
     # now, our caller inherits from Coat::Persistent
     eval { Coat::_extends_class( ['Coat::Persistent'], $caller ) };
