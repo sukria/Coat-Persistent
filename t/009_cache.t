@@ -1,9 +1,15 @@
 use strict;
 use warnings;
-use Test::More tests => 5;
+use Test::More 'no_plan';
 
 BEGIN { use_ok 'Coat::Persistent' }
 
+# must have Cache::FastMmap isntalled
+eval "use Cache::FastMmap";
+my $have_cache_fastmmap = ($@ ? 0 : 1);
+
+SKIP: {
+     skip "Cache::FastMmap not installed", 10 unless $have_cache_fastmmap;
 {
     package Person;
     use Coat;
@@ -43,3 +49,8 @@ is($p1->name, $p3->name, '$p1 and $p3 are the same : name changed' );
 $dbh->do("DROP TABLE person");
 $dbh->do("DROP TABLE dbix_sequence_state");
 $dbh->do("DROP TABLE dbix_sequence_release");
+};
+
+
+
+

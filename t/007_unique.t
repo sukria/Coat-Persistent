@@ -1,7 +1,6 @@
 use strict;
 use warnings;
 use Test::More 'no_plan';
-use Test::Exception;
 
 BEGIN { use_ok 'Coat::Persistent' }
 {
@@ -23,11 +22,12 @@ foreach my $name ('Joe', 'John', 'Brenda') {
 }
 
 # tests
-throws_ok {
-    my $p = new Person name => 'Joe'; 
+my $p;
+eval {
+    $p = new Person name => 'Joe'; 
     $p->save;
-} qr/Value Joe violates unique constraint for attribute name \(class Person\)/, 
-'unable to save a person with name "Joe" : unique value already taken';
+};
+ok( $@, "Value Joe violates unique constraint for attribute name");
 
 # clean
 $dbh->do("DROP TABLE person");
