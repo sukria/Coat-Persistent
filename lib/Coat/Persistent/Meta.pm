@@ -14,6 +14,22 @@ my @attributes = qw(table_name primary_key accessor);
 # ex: Coat::Persistent::Meta->model('User')
 sub registry { $META->{ $_[1] } }
 
+sub attribute {
+    my ($self, $class, $attribute) = @_;
+    $META->{ $class }{attributes} ||= [];
+    push @{ $META->{ $class }{'attributes'} }, $attribute;
+}
+
+sub attribute_exists {
+    my ($self, $class, $attribute) = @_;
+    return grep /^$attribute$/, @{ $META->{ $class }{'attributes'} };
+}
+
+sub attributes {
+    my ($self, $class) = @_;
+    return @{ $META->{ $class }{'attributes'} };
+}
+
 # this is to avoid writing several times the same setters and 
 # writers for the class
 # (closures are the hidden gold behind Perl!)
