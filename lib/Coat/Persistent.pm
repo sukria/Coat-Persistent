@@ -6,6 +6,8 @@ use Coat::Meta;
 use Coat::Persistent::Meta;
 use Carp 'confess';
 
+use Data::Dumper;
+
 # Low-level helpers
 use Digest::MD5 qw(md5_base64);
 use Scalar::Util qw(blessed looks_like_number);
@@ -134,6 +136,7 @@ sub has_p {
     $CONSTRAINTS->{'!syntax'}{$caller}{$attr} = $options{syntax} || undef;
 
     Coat::has( $attr, ( '!caller' => $caller, %options ) );
+    Coat::Persistent::Meta->attribute($caller, $attr);
 
     # find_by_
     my $sub_find_by = sub {
@@ -427,19 +430,21 @@ sub find_by_sql {
         # if any rows, let's process them
         if (@$rows) {
             # we have to find out which fields are real attributes
-            my $class_attr = Coat::Meta->all_attributes( $class );
-            my @attrs = keys %$class_attr;
-            
-            # from the columns selected, where are real attributes and virtual ones?
+            my @attrs = Coat::Persistent::Meta->attributes( $class );
             my $lc = new List::Compare(\@attrs, [keys %{ $rows->[0] }]);
             my @given_attr   = $lc->get_intersection;
             my @virtual_attr = $lc->get_symdiff;
 
             # create the object with attributes, and set virtual ones
             foreach my $r (@$rows) {
+
                 my $obj = $class->new(map { ($_ => $r->{$_}) } @given_attr);
                 $obj->init_on_find();
-                $obj->{$_} = $r->{$_} for @virtual_attr;
+                # $obj->{$_} = $r->{$_} for @virtual_attr;
+                foreach my $field (@virtual_attr) {
+                    $obj->{$field} = $r->{$field} if defined  $r->{$field};
+                }
+
                 push @objects, $obj;
             }
         }
