@@ -22,7 +22,7 @@ use SQL::Abstract;
 use vars qw($VERSION @EXPORT $AUTHORITY);
 use base qw(Exporter);
 
-$VERSION   = '0.101';
+$VERSION   = '0.102';
 $AUTHORITY = 'cpan:SUKRIA';
 @EXPORT    = qw(has_p has_one has_many);
 
@@ -430,7 +430,7 @@ sub find_by_sql {
         # if any rows, let's process them
         if (@$rows) {
             # we have to find out which fields are real attributes
-            my @attrs = Coat::Persistent::Meta->attributes( $class );
+            my @attrs = Coat::Persistent::Meta->linearized_attributes( $class );
             my $lc = new List::Compare(\@attrs, [keys %{ $rows->[0] }]);
             my @given_attr   = $lc->get_intersection;
             my @virtual_attr = $lc->get_symdiff;
@@ -440,9 +440,8 @@ sub find_by_sql {
 
                 my $obj = $class->new(map { ($_ => $r->{$_}) } @given_attr);
                 $obj->init_on_find();
-                # $obj->{$_} = $r->{$_} for @virtual_attr;
                 foreach my $field (@virtual_attr) {
-                    $obj->{$field} = $r->{$field} if defined  $r->{$field};
+                    $obj->{$field} = $r->{$field};
                 }
 
                 push @objects, $obj;
@@ -474,7 +473,7 @@ sub validate {
     my $table_name  = Coat::Persistent::Meta->table_name($class);
     my $primary_key = Coat::Persistent::Meta->primary_key($class);
     
-    foreach my $attr (keys %{ Coat::Meta->all_attributes($class)} ) {
+    foreach my $attr (Coat::Persistent::Meta->linearized_attributes($class) ) {
         # checking for syntax validation
         if (defined $CONSTRAINTS->{'!syntax'}{$class}{$attr}) {
             my $regexp = $CONSTRAINTS->{'!syntax'}{$class}{$attr};
@@ -555,7 +554,7 @@ sub save {
     $self->validate();
 
     # all the attributes of the class
-    my @fields = keys %{ Coat::Meta->all_attributes( ref $self ) };
+    my @fields = Coat::Persistent::Meta->linearized_attributes( ref $self );
     # a hash containing attr/value pairs for the current object.
     my %values = map { $_ => $self->$_ } @fields;
 
