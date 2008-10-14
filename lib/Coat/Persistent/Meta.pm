@@ -27,7 +27,20 @@ sub attribute_exists {
 
 sub attributes {
     my ($self, $class) = @_;
+    $META->{ $class }{'attributes'} ||= [];
     return @{ $META->{ $class }{'attributes'} };
+}
+
+sub linearized_attributes {
+    my ($self, $class) = @_;
+    
+    my @all = ();
+    foreach my $c (reverse Coat::Meta->linearized_isa( $class ) ) {
+        foreach my $attr (Coat::Persistent::Meta->attributes( $c )) {
+            push(@all, $attr) unless (grep(/^$attr$/, @all));
+        }
+    }
+    return @all;
 }
 
 # this is to avoid writing several times the same setters and 
