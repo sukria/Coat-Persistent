@@ -18,11 +18,15 @@ use DBI;
 use DBIx::Sequence;
 use SQL::Abstract;
 
+# Constants
+use constant CP_ENTRY_NEW => 0;
+use constant CP_ENTRY_EXISTS => 1;
+
 # Module meta-data
 use vars qw($VERSION @EXPORT $AUTHORITY);
 use base qw(Exporter);
 
-$VERSION   = '0.102';
+$VERSION   = '0.103';
 $AUTHORITY = 'cpan:SUKRIA';
 @EXPORT    = qw(has_p has_one has_many);
 
@@ -444,6 +448,7 @@ sub find_by_sql {
                     $obj->{$field} = $r->{$field};
                 }
 
+                $obj->{_db_state} = CP_ENTRY_EXISTS;
                 push @objects, $obj;
             }
         }
@@ -465,6 +470,11 @@ sub find_by_sql {
 
 
 sub init_on_find {
+}
+
+sub BUILD {
+    my ($self) = @_;
+    $self->{_db_state} = CP_ENTRY_NEW;
 }
 
 sub validate {
@@ -558,8 +568,8 @@ sub save {
     # a hash containing attr/value pairs for the current object.
     my %values = map { $_ => $self->$_ } @fields;
 
-    # if we have an id, update
-    if ( defined $self->$primary_key ) {
+    # if not a new object, we have to update
+    if ( $self->_db_state == CP_ENTRY_EXISTS ) {
         # generate the SQL
         my ($sql, @values) = $sql_abstract->update(
             $table_name, \%values, { $primary_key => $self->$primary_key});
@@ -569,7 +579,7 @@ sub save {
           or confess "Unable to execute query \"$sql\" : $DBI::errstr";
     }
 
-    # no id, insert with a valid id
+    # new object, insert
     else {
         # get our ID from the sequence
         $self->$primary_key( $self->_next_id );
@@ -583,6 +593,8 @@ sub save {
         my $sth = $dbh->prepare($sql);
         $sth->execute( @values )
           or confess "Unable to execute query \"$sql\" : $DBI::errstr";
+
+        $self->{_db_state} = CP_ENTRY_EXISTS;
     }
 
     # if subobjects defined, save them
@@ -654,6 +666,13 @@ sub _next_id {
     my $sequence = new DBIx::Sequence({ dbh => $dbh });
     my $id = $sequence->Next($table);
     return $id;
+}
+
+# Returns a constant describing if the object exists or not
+# already in the underlying DB
+sub _db_state {
+    my ($self) = @_;
+    return $self->{_db_state} ||= CP_ENTRY_NEW;
 }
 
 # DBIx::Sequence needs two tables in the schema,
