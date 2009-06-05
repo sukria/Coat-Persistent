@@ -13,10 +13,11 @@ BEGIN { use_ok 'Coat::Persistent' }
 
 Person->map_to_dbi('csv', 'f_dir=./t/csv-test-database');
 
+
 # fixture
 my $dbh = Person->dbh;
 $dbh->do("CREATE TABLE person (id INTEGER, name CHAR(64), age INTEGER)");
-foreach my $name ('Joe', 'John', 'Brenda') {
+foreach my $name ('MisterJoe', 'MisterJohn', 'MissBrenda') {
     my $p = new Person name => $name, age => 20;
     $p->save;
 }
@@ -24,10 +25,10 @@ foreach my $name ('Joe', 'John', 'Brenda') {
 # tests
 my $p;
 eval {
-    $p = new Person name => 'Joe'; 
+    $p = Person->new(name => 'MisterJoe'); 
     $p->save;
 };
-ok( $@, "Value Joe violates unique constraint for attribute name");
+ok( $@, "Value MisterJoe violates unique constraint for attribute name");
 
 # clean
 $dbh->do("DROP TABLE person");
