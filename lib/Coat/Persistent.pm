@@ -26,7 +26,7 @@ use constant CP_ENTRY_EXISTS => 1;
 use vars qw($VERSION @EXPORT $AUTHORITY);
 use base qw(Exporter);
 
-$VERSION   = '0.103';
+$VERSION   = '0.104';
 $AUTHORITY = 'cpan:SUKRIA';
 @EXPORT    = qw(has_p has_one has_many);
 
@@ -817,6 +817,34 @@ You have to tell Coat::Persistent how to map a class to a DBI driver. You can
 either choose to define a default mapper (in most of the cases this is what
 you want) or define a mapper for a specific class.
 
+In order for your mapping to be possible, the driver you use must be known by
+Coat::Persistent, you can modify its driver mapping matrix if needed.
+
+=over 4
+
+=item B<drivers( )>
+
+Return a hashref representing all the drivers mapped.
+
+  MyClass->drivers;
+
+=item B<get_driver( $name )>
+
+Return the Perl module of the driver defined for the given driver name.
+  
+  MyClass->get_driver( 'mysql' );
+
+=item B<add_driver( $name, $module )>
+
+Add or replace a driver mapping rule. 
+
+  MyClass->add_driver( sqlite => 'dbi:SQLite' );
+
+=back
+
+Then, you can use your driver in mapping rules. Basically, the mapping will
+generate a DBI-E<gt>connect() call.
+
 =over 4 
 
 =item B<Coat::Persistent-E<gt>map_to_dbi $driver, @options >
@@ -953,12 +981,6 @@ features for accessing and touching the database below the abstraction layer.
 Those methods must be called in class-context.
 
 =over 4 
-
-=item B<find( @conditions, \%options )>
-
-Find operates with three different retrieval approaches:
-
-=over 4
 
 =item I<Find by id>: This can either be a specific id or a list of ids (1, 5,
 6)
