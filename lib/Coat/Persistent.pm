@@ -583,7 +583,7 @@ sub save {
     confess "Cannot save without a mapping defined for class " . ref $self
       unless defined $dbh;
 
-    # first call validate to check the object is sane
+    # make sure the object is sane
     $self->validate();
 
     # all the attributes of the class
@@ -593,6 +593,7 @@ sub save {
 
     # if not a new object, we have to update
     if ( $self->_db_state == CP_ENTRY_EXISTS ) {
+
         # generate the SQL
         my ($sql, @values) = $sql_abstract->update(
             $table_name, \%values, { $primary_key => $self->$primary_key});
@@ -606,13 +607,13 @@ sub save {
     else {
         # if the id has been touched, trigger an error, that's not possible
         # with the use of DBIx::Sequence
-        if ($self->id) {
+        if ($self->{id}) {
             confess "The id has been set on a newborn object of class ".ref($self).", cannot save, id would change";
         }
 
         # get our ID from the sequence
         $self->$primary_key( $self->_next_id );
-
+    
         # generate the SQL
         my ($sql, @values) = $sql_abstract->insert(
             $table_name, { %values, $primary_key => $self->$primary_key });
