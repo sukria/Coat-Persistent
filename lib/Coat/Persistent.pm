@@ -79,6 +79,31 @@ sub disable_cache {
     undef $MAPPINGS->{'!cache'}{$class};
 }
 
+# A singleton that stores the driver/module mappings
+# The ones here are default drivers that are known to be compliant
+# with Coat::Persistent.
+# Any DBI driver should work though.
+my $drivers = {
+    csv    => 'DBI:CSV',
+    mysql  => 'dbi:mysql',
+    sqlite => 'dbi:SQLite',
+};
+sub drivers { $drivers }
+
+# Accessor to a driver
+sub get_driver {
+    my ($class, $driver) = @_;
+    confess "driver needed" unless $driver;
+    return $class->drivers->{$driver};
+}
+
+# This lets you add the DBI driver you want to use
+sub add_driver {
+    my ($class, $driver, $module) = @_;
+    confess "driver and module needed" unless $driver and $module;
+    $class->drivers->{$driver} = $module;
+}
+
 # This is the configration stuff, you basically bind a class to
 # a DBI driver
 sub map_to_dbi {
@@ -88,11 +113,9 @@ sub map_to_dbi {
     # if map_to_dbi is called from Coat::Persistent, this is the default dbh
     $class = '!default' if $class eq 'Coat::Persistent';
 
-    my $drivers = {
-        mysql => 'dbi:mysql',
-        csv   => 'DBI:CSV',
-    };
-    confess "No such driver : $driver"
+    my $drivers = Coat::Persistent->drivers;
+
+    confess "No such driver : $driver, please register the driver first with add_driver()"
       unless exists $drivers->{$driver};
 
     # the csv driver needs to load the appropriate DBD module
@@ -581,6 +604,12 @@ sub save {
 
     # new object, insert
     else {
+        # if the id has been touched, trigger an error, that's not possible
+        # with the use of DBIx::Sequence
+        if ($self->id) {
+            confess "The id has been set on a newborn object of class ".ref($self).", cannot save, id would change";
+        }
+
         # get our ID from the sequence
         $self->$primary_key( $self->_next_id );
 
