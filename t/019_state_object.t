@@ -29,13 +29,9 @@ is( Coat::Persistent::CP_ENTRY_EXISTS, $john2->_db_state, 'CP_ENTRY_EXISTS on fi
 my $brenda = Person->new( name => 'Brenda' );
 is(Coat::Persistent::CP_ENTRY_NEW, $brenda->_db_state, 'CP_ENTRY_NEW on new object' );
 
-$brenda->id(4); # hey we change the primary key here ! 
-$brenda->save;
-is(Coat::Persistent::CP_ENTRY_EXISTS, $brenda->_db_state, 'CP_ENTRY_EXISTS on save');
-is( 4, $brenda->id, 'arbitrary id is kept');
-
-my $brenda2 = Person->find(2);
-ok(defined $brenda2, 'find with id 2 worked');
+$brenda->id(4); # hey we change the primary key here, cannot work ! 
+eval { $brenda->save; };
+ok($@, 'cannot touch a newborn object id');
 
 my $bob = Person->create(name => 'Bob');
 ok($bob->id != $brenda->id, 'id are not messed');
