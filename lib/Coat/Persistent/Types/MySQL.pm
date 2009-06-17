@@ -55,4 +55,34 @@ coerce 'MySQL:Date'
         return "$year-$mon-$day";
     };
 
+coerce 'Int'
+    => from 'MySQL:Date'
+    => via {
+        my ($year, $mon, $day) = /^(\d{4})-(\d\d)-(\d\d)$/;
+        $year -= 1900;
+        $mon--;
+        return mktime(0, 0, 0, ~~$day, $mon, $year);
+    };
+
+# year 
+
+subtype 'MySQL:Year'
+    => as 'Int'
+    => where { /^\d{4}$/ };
+
+coerce 'MySQL:Year'
+    => from 'Int'
+    => via { 
+        my ($sec, $min, $hour, $day, $mon, $year) = localtime($_);
+        return $year += 1900;
+    };
+
+coerce 'Int'
+    => from 'MySQL:Year'
+    => via {
+        my $year = $_;
+        $year -= 1900;
+        return mktime(0, 0, 0, 1, 0, $year);
+    };
+
 1;
