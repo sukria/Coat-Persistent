@@ -4,35 +4,7 @@ use Test::More 'no_plan';
 
 BEGIN { use_ok 'Coat::Persistent' }
     
-use POSIX;
-use Coat::Types;
 
-subtype 'DateTime'
-    => as 'Str'
-    => where { /^\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d$/ };
-
-coerce 'DateTime'
-    => from 'Int'
-    => via { 
-        my ($sec, $min, $hour, $day, $mon, $year) = localtime($_);
-        $year += 1900;
-        $mon++;
-        $day = sprintf('%02d', $day);
-        $mon = sprintf('%02d', $mon);
-        $hour = sprintf('%02d', $hour);
-        $min = sprintf('%02d', $min);
-        $sec = sprintf('%02d', $sec);
-        return "$year-$mon-$day $hour:$min:$sec";
-    };
-
-coerce 'Int'
-    => from 'DateTime'
-    => via {
-        my ($year, $mon, $day, $hour, $min, $sec) = /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)$/;
-        $year -= 1900;
-        $mon--;
-        return mktime(~~$sec, ~~$min, ~~$hour, ~~$day, $mon, $year);
-    };
 {
     package Person;
     use Coat;
