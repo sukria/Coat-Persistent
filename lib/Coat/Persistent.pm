@@ -4,6 +4,7 @@ package Coat::Persistent;
 use Coat;
 use Coat::Meta;
 use Coat::Persistent::Meta;
+use Coat::Persistent::Constraint;
 use Carp 'confess';
 
 use Data::Dumper;
@@ -35,7 +36,6 @@ my $sql_abstract = SQL::Abstract->new;
 
 # configuration place-holders
 my $MAPPINGS    = {};
-my $CONSTRAINTS = {};
 
 # static accessors
 sub mappings { $MAPPINGS }
@@ -158,9 +158,10 @@ sub has_p {
     confess "package main called has_p" if $caller eq 'main';
 
     # unique field ?
-    $CONSTRAINTS->{'!unique'}{$caller}{$attr} = $options{unique} || 0;
-    # syntax check ?
-    $CONSTRAINTS->{'!syntax'}{$caller}{$attr} = $options{syntax} || undef;
+    Coat::Persistent::Constraint->add_constraint('unique', $caller, $attr, $options{unique});
+    
+    # storage type ?
+#     $CONSTRAINTS->{'!store_as'}{$caller}{$attr} = $options{store_as} || undef;
 
     Coat::has( $attr, ( '!caller' => $caller, %options ) );
     Coat::Persistent::Meta->attribute($caller, $attr);
@@ -507,16 +508,9 @@ sub validate {
     my $primary_key = Coat::Persistent::Meta->primary_key($class);
     
     foreach my $attr (Coat::Persistent::Meta->linearized_attributes($class) ) {
-        # checking for syntax validation
-        if (defined $CONSTRAINTS->{'!syntax'}{$class}{$attr}) {
-            my $regexp = $CONSTRAINTS->{'!syntax'}{$class}{$attr};
-            confess "Value \"".$self->$attr."\" for attribute \"$attr\" is not valid"
-                unless $self->$attr =~ /$regexp/;
-        }
         
         # checking for unique attributes on inserting (new objects)
-        if ((! defined $self->$primary_key) && 
-            $CONSTRAINTS->{'!unique'}{$class}{$attr}) {
+        if (Coat::Persistent::Constraint->get_constraint('unique', $class, $attr)) {
             # look for other instances that already have that attribute
             my @items = $class->find(["$attr = ?", $self->$attr]);
             confess "Value ".$self->$attr." violates unique constraint "

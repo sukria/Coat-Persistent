@@ -6,8 +6,13 @@ BEGIN { use_ok 'Coat::Persistent' }
 {
     package Person;
     use Coat;
+    use Coat::Types;
     use Coat::Persistent;
-    has_p name => (isa => 'Str', unique => 1, syntax => '[a-zA-Z]{2}');
+    
+    subtype 'Person:Name' => as 'Str' => where { /[a-zA-Z]{2}/ };
+    has_p name => (isa => 'Person:Name', unique => 1);
+    #has_p name => (isa => 'Str', unique => 1, syntax => '[a-zA-Z]{2}'); # DEPRECATED now
+
     has_p age  => (isa => 'Int');
 }
 
