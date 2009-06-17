@@ -150,6 +150,16 @@ sub map_to_dbi {
     _create_dbix_sequence_tables($MAPPINGS->{'!dbh'}{$class});
 }
 
+# This is used if you already have a dbh instead of creating one with 
+# map_to_dbi 
+sub set_dbh {
+    my ($class, $dbh) = @_;
+    confess "Cannot set an undefined dbh" unless defined $dbh;
+
+    $class = '!default' if $class eq 'Coat::Persistent';
+    $MAPPINGS->{'!dbh'}{$class} = $dbh;
+    _create_dbix_sequence_tables($MAPPINGS->{'!dbh'}{$class});
+}
 
 # This is done to wrap the original Coat::has method so we can
 # generate finders for each attribute declared
@@ -864,6 +874,24 @@ You can overide those conventions at import time:
             primary_key => 'mid';     # default would be 'id'
 
 =head1 CONFIGURATION
+
+You have two options for setting a database handle to your class. Either you
+already have a dbh an you set it to your class, or you don't and you let
+Coat::Persistent initialize it.
+
+If you already have a database handle, use Coat::Persistent->set_dbh($dbh),
+otherwise, use the DBI mapping explained below.
+
+=head2 Setting an existing database handle
+
+=over 4
+
+=item B<set_dbh($dbh)>
+
+Set the given database handle for the calling class (set it by default if class
+is Coat::Persistent).
+
+=back
 
 =head2 DBI MAPPING
 
