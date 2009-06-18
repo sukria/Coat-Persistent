@@ -1,16 +1,20 @@
+use strict;
+use warnings;
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
-    NAME => 'Coat::Persistent',
+    NAME         => 'Coat::Persistent',
+    AUTHOR       => 'Alexis Sukrieh (sukria) <sukria@cpan.org>',
+    LICENCE      => 'perl',
     VERSION_FROM => 'lib/Coat/Persistent.pm',
-    PREREQ_PM => {
-        'Coat' => '0.1_0.6',
+    ABSTRACT     => "ORM based on the Moose-like engine `Coat'",
+    PREREQ_PM    => {
+        'Coat' => '0.334',
         'DBI'  => '0',
         'DBIx::Sequence' => 0,
-	'DBD::CSV' => 0, # needed for the test suite
+        'DBD::CSV' => 0, # needed for the test suite
         'SQL::Abstract' => 0,
         'List::Compare' => 0,
     },
-    ABSTRACT => "Ruby's ActiveRecord::Base port for Perl (ORM)",
     test => {TESTS => join( ' ', glob( 't/*.t' ))},
 );
