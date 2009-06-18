@@ -16,5 +16,7 @@ WriteMakefile(
         'SQL::Abstract' => 0,
         'List::Compare' => 0,
     },
-    test => {TESTS => join( ' ', glob( 't/*.t' ))},
+    test  => {TESTS => join( ' ', glob( 't/*.t' ))},
+    dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
+    clean => { FILES => 't/csv-test-database'},
 );
