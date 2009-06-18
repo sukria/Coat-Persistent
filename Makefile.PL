@@ -5,7 +5,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME         => 'Coat::Persistent',
     AUTHOR       => 'Alexis Sukrieh (sukria) <sukria@cpan.org>',
-    LICENCE      => 'perl',
+    LICENSE      => 'perl',
     VERSION_FROM => 'lib/Coat/Persistent.pm',
     ABSTRACT     => "ORM based on the Moose-like engine `Coat'",
     PREREQ_PM    => {
