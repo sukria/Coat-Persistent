@@ -59,3 +59,4 @@ ok($joe2->birth_date('1979-11-20'), 'birth_date set with a Date');
 ok($joe2->save, '$joe2->save');
 ok($joe2->birth_date ne '1979-11-20', 'birth_date was coerced: '.$joe2->birth_date);
 
+$dbh->do("DROP TABLE people");
