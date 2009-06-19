@@ -1,3 +1,8 @@
+2009-06-19  - 0.210 - Alexis Sukrieh
+    * New module Coat::Persistent::Types for providing default types and coercions
+    * Class::Date support for default types
+    * Uses now Class::Date instead of handling time dans dates by hand.
+
 2009-06-19  - 0.200 - Alexis Sukrieh
 
     * Support for the `store_as' option for attribute declaration.
