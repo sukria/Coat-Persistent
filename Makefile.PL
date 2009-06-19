@@ -12,7 +12,6 @@ WriteMakefile(
         'Coat'           => '0.334',
         'DBI'            => '0',
         'DBIx::Sequence' => '0',
-        'Iterator::DBI'  => '0',
         'DBD::CSV'       => '0', # needed for the test suite
         'SQL::Abstract'  => '0',
         'List::Compare'  => '0',
