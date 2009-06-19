@@ -1,0 +1,6 @@
+2009-06-19  - 0.200 - Alexis Sukrieh
+
+    * Support for the `store_as' option for attribute declaration.
+    * Added Coat::Persistent::Types::MySQL for providing default data types for
+      MySQL date fields.
+
