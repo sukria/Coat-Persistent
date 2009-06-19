@@ -12,6 +12,7 @@ WriteMakefile(
         'Coat'           => '0.334',
         'DBI'            => '0',
         'DBIx::Sequence' => '0',
+        'Class::Date'    => '0', # For the types defined 
         'DBD::CSV'       => '0', # needed for the test suite
         'SQL::Abstract'  => '0',
         'List::Compare'  => '0',

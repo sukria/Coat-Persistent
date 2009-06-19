@@ -16,13 +16,13 @@ BEGIN { use_ok 'Coat::Persistent' }
 
     has_p 'created_at' => (
         is => 'rw',
-        isa => 'Int',
+        isa => 'UnixTimestamp',
         store_as => 'MySQL:DateTime',
     );
 
     has_p 'birth_date' => (
         is => 'rw',
-        isa => 'Int',
+        isa => 'UnixTimestamp',
         store_as => 'MySQL:Date',
     );
 }

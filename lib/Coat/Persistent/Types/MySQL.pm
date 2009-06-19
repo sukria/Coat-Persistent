@@ -6,8 +6,9 @@ package Coat::Persistent::Types::MySQL;
 use strict;
 use warnings;
 
-use POSIX;
 use Coat::Types;
+use Coat::Persistent::Types;
+use Class::Date;
 
 # datetime' 
 
@@ -16,27 +17,12 @@ subtype 'MySQL:DateTime'
     => where { /^\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d$/ };
 
 coerce 'MySQL:DateTime'
-    => from 'Int'
-    => via { 
-        my ($sec, $min, $hour, $day, $mon, $year) = localtime($_);
-        $year += 1900;
-        $mon++;
-        $day = sprintf('%02d', $day);
-        $mon = sprintf('%02d', $mon);
-        $hour = sprintf('%02d', $hour);
-        $min = sprintf('%02d', $min);
-        $sec = sprintf('%02d', $sec);
-        return "$year-$mon-$day $hour:$min:$sec";
-    };
+    => from 'UnixTimestamp'
+    => via { Class::Date->new($_)->string };
 
-coerce 'Int'
+coerce 'UnixTimestamp'
     => from 'MySQL:DateTime'
-    => via {
-        my ($year, $mon, $day, $hour, $min, $sec) = /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)$/;
-        $year -= 1900;
-        $mon--;
-        return mktime(~~$sec, ~~$min, ~~$hour, ~~$day, $mon, $year);
-    };
+    => via { $_->epoch };
 
 # date
 
@@ -45,24 +31,17 @@ subtype 'MySQL:Date'
     => where { /^\d{4}-\d\d-\d\d$/ };
 
 coerce 'MySQL:Date'
-    => from 'Int'
+    => from 'UnixTimestamp'
     => via { 
-        my ($sec, $min, $hour, $day, $mon, $year) = localtime($_);
-        $year += 1900;
-        $mon++;
-        $day = sprintf('%02d', $day);
-        $mon = sprintf('%02d', $mon);
-        return "$year-$mon-$day";
+        my $date = Class::Date->new($_);
+        my $str = $date->ymd;
+        $str =~ s/\//-/g;
+        return $str;
     };
 
-coerce 'Int'
+coerce 'UnixTimestamp'
     => from 'MySQL:Date'
-    => via {
-        my ($year, $mon, $day) = /^(\d{4})-(\d\d)-(\d\d)$/;
-        $year -= 1900;
-        $mon--;
-        return mktime(0, 0, 0, int($day), int($mon), $year);
-    };
+    => via { Class::Date->new($_)->epoch };
 
 1;
 __END__
