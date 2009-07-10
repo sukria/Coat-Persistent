@@ -646,7 +646,7 @@ sub get_storage_value_for {
 
 # serialize the instance and save it with the mapper defined
 sub save {
-    my ($self) = @_;
+    my ($self, $conditions) = @_;
     my $class  = ref $self;
     my $dbh    = $class->dbh;
     my $table_name  = Coat::Persistent::Meta->table_name($class);
@@ -668,15 +668,21 @@ sub save {
     # if not a new object, we have to update
     if ( $self->_db_state == CP_ENTRY_EXISTS ) {
 
-        # TODO : cannot update an entry without a primary_key for now
-        # maybe provide a support for this syntax:
-        #   $obj->save("column = X");
-        confess "cannot update without a primary key"
-            unless defined $primary_key;
+        # In order to update and entry, we need either a primary key or a sql
+        # condition
+        confess "cannot update without a primary key and a SQL condition"
+            if (not defined $primary_key) and (not defined $conditions);
 
         # generate the SQL
-        my ($sql, @values) = $sql_abstract->update(
-            $table_name, \%values, { $primary_key => $self->$primary_key});
+        my ($sql, @values);
+        if (defined $primary_key) {
+            ($sql, @values) = $sql_abstract->update(
+                $table_name, \%values, { $primary_key => $self->$primary_key});
+        } 
+        else { 
+            ($sql, @values) = $sql_abstract->update(
+                $table_name, \%values, $conditions);
+        }
         # execute the query
         my $sth = $dbh->prepare($sql);
         $sth->execute( @values )
