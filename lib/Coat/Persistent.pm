@@ -280,6 +280,9 @@ sub has_one {
     my $owned_class       = $options{class_name} || $name;
     my $owned_table_name  = Coat::Persistent::Meta->table_name($owned_class);
     my $owned_primary_key = Coat::Persistent::Meta->primary_key($owned_class);
+
+    confess "The class \"$owned_class\" does not have a primary key."
+        unless defined $owned_primary_key;
     
     my $attr_name = (defined $options{class_name}) ? $name : $owned_table_name ;
 
@@ -328,6 +331,10 @@ sub has_many {
     my $primary_key       = Coat::Persistent::Meta->primary_key($class);
     my $owned_table_name  = Coat::Persistent::Meta->table_name($owned_class);
     my $owned_primary_key = Coat::Persistent::Meta->primary_key($owned_class);
+    
+    confess "The class \"$owned_class\" does not have a primary key."
+        unless defined $owned_primary_key;
+    
     
     my $attr_name = (defined $options{class_name}) 
                   ? $name 
@@ -383,16 +390,25 @@ sub import {
     # now, our caller inherits from Coat::Persistent
     eval { Coat::_extends_class( ['Coat::Persistent'], $caller ) };
 
-    # default values for mapping rules
-    $options{primary_key} ||= 'id';
+    # is the primary_key disabled?
+    if (exists($options{primary_key}) && (not defined $options{primary_key})) {
+        $options{primary_key} = undef;
+    }
+    else {
+        $options{primary_key} ||= 'id';
+    }
+
+    # the table_name if not defined is taken from the model name
     $options{table_name}  ||= $caller->_to_sql;
 
     # save the meta information obout the model mapping
     Coat::Persistent::Meta->table_name($caller, $options{table_name});
     Coat::Persistent::Meta->primary_key($caller, $options{primary_key});
 
-    # a Coat::Persistent object must have a the primary key)
-    has_p $options{primary_key} => ( isa => 'Int', '!caller' => $caller );
+    # if the primary_key is defined
+    if (defined $options{primary_key}) {
+        has_p $options{primary_key} => ( isa => 'Int', '!caller' => $caller );
+    }
 
     # we have a couple of symbols to export outside
     Coat::Persistent->export_to_level( 1, ($class, @EXPORT) );
@@ -451,6 +467,11 @@ sub find {
         else {
             # the first item looks like a number (then it's an ID)
             if (looks_like_number $value) {
+                
+                # can I haz primary_key?
+                confess "Cannot use find(ID) queries without a primary key defined" 
+                    unless defined $primary_key;
+
                 my ($sql, @values) = $sql_abstract->select( 
                                         $from, 
                                         $select, 
@@ -542,7 +563,6 @@ sub validate {
     my ($self, @args) = @_;
     my $class = ref($self);
     my $table_name  = Coat::Persistent::Meta->table_name($class);
-    my $primary_key = Coat::Persistent::Meta->primary_key($class);
     
     foreach my $attr (Coat::Persistent::Meta->linearized_attributes($class) ) {
         
@@ -563,6 +583,11 @@ sub delete {
     my $dbh    = $class->dbh;
     my $table_name  = Coat::Persistent::Meta->table_name($class);
     my $primary_key = Coat::Persistent::Meta->primary_key($class);
+
+    # TODO : we should provide a delete_by_$attr method for each attribute
+    # and a also delete('condition SQL') support.
+    confess "Cannot delete an entry without a primary_key defined" 
+        unless defined $primary_key;
 
     confess "Cannot delete without an id" 
         if (!ref $self && !defined $id);
@@ -616,21 +641,6 @@ sub get_storage_value_for {
     }
     else {
         return $self->$attr_name;
-    }
-}
-
-# Takes a value (taken from the DB) and convert it to the real value for the attribute
-sub get_real_value_for {
-    my ($self, $attr_name, $value) = @_;
-    my $class = ref $self;
-
-    my $attr = Coat::Meta->attribute($class, $attr_name);
-    if ($attr->{store_as}) {
-        my $type = Coat::Types::find_type_constraint($attr->{isa});
-        return $type->coerce($value);
-    }
-    else {
-        return $value;
     }
 }
 

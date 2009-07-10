@@ -47,7 +47,6 @@ my $t_str = $joe->get_storage_value_for('created_at');
 
 is($t, $joe->created_at, "created_at is an int : $t ");
 ok($t ne $t_str, "created_at storage value is : $t_str");
-is($t, $joe->get_real_value_for('created_at', $joe->get_storage_value_for('created_at')), 'real_value is correctly converted');
 ok($joe->save, '$joe->save');
 
 my $joe2 = Person->find($joe->pid);

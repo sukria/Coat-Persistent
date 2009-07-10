@@ -52,8 +52,8 @@ is( 'people', Coat::Persistent::Meta->table_name('Person'), 'good table_name' );
 is( 'people_id', Coat::Persistent::Meta->primary_key( 'Person'), 'good primary_key' );
 
 my $p = Person->create( name => 'John' );
-is( 1, $p->people_id, 'primary_key people_id is set' );
-is( 'John', $p->name, 'name is set' );
+is( $p->people_id, 1, 'primary_key people_id is set' );
+is( $p->name, 'John', 'name is set' );
 
 $p = Person->find_by_name( 'John' );
 ok( defined $p, 'find_by_name works' );
