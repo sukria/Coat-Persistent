@@ -668,6 +668,12 @@ sub save {
     # if not a new object, we have to update
     if ( $self->_db_state == CP_ENTRY_EXISTS ) {
 
+        # TODO : cannot update an entry without a primary_key for now
+        # maybe provide a support for this syntax:
+        #   $obj->save("column = X");
+        confess "cannot update without a primary key"
+            unless defined $primary_key;
+
         # generate the SQL
         my ($sql, @values) = $sql_abstract->update(
             $table_name, \%values, { $primary_key => $self->$primary_key});
@@ -679,25 +685,31 @@ sub save {
 
     # new object, insert
     else {
-        # if the id has been touched, trigger an error, that's not possible
-        # with the use of DBIx::Sequence
-        if ($self->{id}) {
-            confess "The id has been set on a newborn object of class ".ref($self).", cannot save, id would change";
+        my ($sql, @values);
+
+        if (defined $primary_key) {
+            # if the id has been touched, trigger an error, that's not possible
+            # with the use of DBIx::Sequence
+            confess "$primary_key has been set on a newborn object of class ".ref($self).", cannot save" 
+                if ($self->$primary_key);
+
+            # get our ID from the sequence
+            $self->$primary_key( $self->_next_id );
+        
+            # generate the SQL
+            ($sql, @values) = $sql_abstract->insert(
+                $table_name, { %values, $primary_key => $self->$primary_key });
         }
-
-        # get our ID from the sequence
-        $self->$primary_key( $self->_next_id );
-    
-        # generate the SQL
-        my ($sql, @values) = $sql_abstract->insert(
-            $table_name, { %values, $primary_key => $self->$primary_key });
-
+        else {
+            # generate the SQL
+            ($sql, @values) = $sql_abstract->insert($table_name, \%values);
+        }
+        
         # execute the query
         #warn "sql: $sql ".join(', ', @values);
         my $sth = $dbh->prepare($sql);
         $sth->execute( @values )
           or confess "Unable to execute query \"$sql\" : $DBI::errstr";
-
         $self->{_db_state} = CP_ENTRY_EXISTS;
     }
 
@@ -708,7 +720,8 @@ sub save {
         }
         delete $self->{_subobjects};
     }
-    return $self->$primary_key;
+    return $self->$primary_key if defined $primary_key;
+    return 'saved'; # if no primary_key defined, return 'saved'
 }
 
 
