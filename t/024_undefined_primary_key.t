@@ -41,6 +41,12 @@ ok( $@, 'unable to find with ID');
 ok( Person->find_by_people_id(42), 'find_by_attr works');
 ok( Person->find("name = 'John'"), 'find with an SQL condition works');
 
+$p->name('Chuck Norris');
+ok( $p->save({ people_id => 42}), 'save works with a condtion and no primary_key');
+
+my $x = Person->find_by_people_id(42);
+is($x->name, 'Chuck Norris', 'name has been changed in database');
+
 # remove the test db
 $dbh->do("DROP TABLE people");
 $dbh->do("DROP TABLE dbix_sequence_state");
