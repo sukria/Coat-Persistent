@@ -3,6 +3,7 @@ package Coat::Persistent::Types;
 use strict;
 use warnings;
 
+use Class::Date;
 use Coat::Types;
 
 subtype 'UnixTimestamp'
