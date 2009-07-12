@@ -50,7 +50,3 @@ $dbh->do("DROP TABLE person");
 $dbh->do("DROP TABLE dbix_sequence_state");
 $dbh->do("DROP TABLE dbix_sequence_release");
 };
-
-
-
-
