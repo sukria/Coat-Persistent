@@ -55,6 +55,14 @@ sub cache {
     undef;
 }
 
+# The internel sequence engine (DBIx::Sequence)
+# If disabled, nothing will be done for the primary keys, their values
+# should be set by the underlying DB.
+my $USE_INTERNAL_SEQUENCE_ENGINE = 1;
+sub has_internal_sequence_engine     { $USE_INTERNAL_SEQUENCE_ENGINE }
+sub enable_internal_sequence_engine  { $USE_INTERNAL_SEQUENCE_ENGINE = 1 }
+sub disable_internal_sequence_engine { $USE_INTERNAL_SEQUENCE_ENGINE = 0 }
+
 # Access to the constraint meta data for the current class
 sub has_unique_constraint {
     my ($class, $attr) = @_;
@@ -147,7 +155,7 @@ sub map_to_dbi {
         unless $MAPPINGS->{'!dbh'}{$class};
 
     # if the DBIx::Sequence tables don't exist, create them
-    _create_dbix_sequence_tables($MAPPINGS->{'!dbh'}{$class});
+    _create_dbix_sequence_tables($MAPPINGS->{'!dbh'}{$class}) if has_internal_sequence_engine();
 }
 
 # This is used if you already have a dbh instead of creating one with 
@@ -158,7 +166,7 @@ sub set_dbh {
 
     $class = '!default' if $class eq 'Coat::Persistent';
     $MAPPINGS->{'!dbh'}{$class} = $dbh;
-    _create_dbix_sequence_tables($MAPPINGS->{'!dbh'}{$class});
+    _create_dbix_sequence_tables($MAPPINGS->{'!dbh'}{$class}) if has_internal_sequence_engine();
 }
 
 # This is done to wrap the original Coat::has method so we can
@@ -670,7 +678,7 @@ sub save {
 
         # In order to update and entry, we need either a primary key or a sql
         # condition
-        confess "cannot update without a primary key and a SQL condition"
+        confess "cannot update without a primary key or a SQL condition"
             if (not defined $primary_key) and (not defined $conditions);
 
         # generate the SQL
@@ -692,22 +700,19 @@ sub save {
     # new object, insert
     else {
         my ($sql, @values);
+            
+        confess "Primary key \"$primary_key\" has been set on a newborn object of class ".ref($self) 
+            if (defined $primary_key && $self->$primary_key);
 
-        if (defined $primary_key) {
-            # if the id has been touched, trigger an error, that's not possible
-            # with the use of DBIx::Sequence
-            confess "$primary_key has been set on a newborn object of class ".ref($self).", cannot save" 
-                if ($self->$primary_key);
-
+        if (defined $primary_key && has_internal_sequence_engine()) {
             # get our ID from the sequence
             $self->$primary_key( $self->_next_id );
-        
+    
             # generate the SQL
             ($sql, @values) = $sql_abstract->insert(
                 $table_name, { %values, $primary_key => $self->$primary_key });
         }
         else {
-            # generate the SQL
             ($sql, @values) = $sql_abstract->insert($table_name, \%values);
         }
         
@@ -716,6 +721,11 @@ sub save {
         my $sth = $dbh->prepare($sql);
         $sth->execute( @values )
           or confess "Unable to execute query \"$sql\" : $DBI::errstr";
+
+        # Retrieve the primary key's value
+        $self->$primary_key($sth->{mysql_insertid} || $sth->{insertid}) 
+            if (defined $primary_key && !has_internal_sequence_engine());
+
         $self->{_db_state} = CP_ENTRY_EXISTS;
     }
 
@@ -726,8 +736,9 @@ sub save {
         }
         delete $self->{_subobjects};
     }
+
     return $self->$primary_key if defined $primary_key;
-    return 'saved'; # if no primary_key defined, return 'saved'
+    return 'saved';
 }
 
 
