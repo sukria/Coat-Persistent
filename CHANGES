@@ -1,5 +1,7 @@
 2009-07-10  - 0.220 - Alexis Sukrieh
-    * PENDING: Add support for undefined primary_keys (bug #47772)
+    * Add support for undefined primary_keys (bug #47772)
+    * Now possible to bypass DBIx::Sequence (bug #47773)
+    * Use Test::Database for MySQL-specific tests
 
 2009-06-19  - 0.210 - Alexis Sukrieh
     * New module Coat::Persistent::Types for providing default types and coercions
