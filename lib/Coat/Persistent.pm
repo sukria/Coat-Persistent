@@ -913,6 +913,43 @@ You can overide those conventions at import time:
             table_name  => 'mymodel', # default would be 'my_model'
             primary_key => 'mid';     # default would be 'id'
 
+=head2 ABOUT PRIMARY KEYS
+
+Even if your table does not have a primary key, you can still use a
+Coat::Persistent model over it. You just have to tell Coat::Persistent that
+this table/model doesn't have a primary key :
+
+   use Coat::Persistent primary_key => undef;
+
+Note that instances of such a model cannot be saved like regular ones: there's
+no primary key, so it's impossible to build UPDATE SQL queries properly. That's
+why you'll have to give a condition whenver you call save().
+
+For the same reason, it's impossible to use find() with numeric values (whi are
+assumed to be primary key values).
+
+Example :
+    package Model;
+    ...
+    use Coat::Persistent primary_key => undef;
+    ...
+
+    package  main;
+
+    my $obj = Model->find(43); # FAIL : there's no primary key known for Model
+    my $obj = Model->find_by_some_attribute(25); # OK
+
+    $obj->save(); # FAIL : the SQL query cannot be built without a primary key
+                  # defined
+
+    $obj->save({some_attribute => 25}); # OK
+
+Note that it's not recommended to use tables whithout primary keys, the support
+is only provided to support existing/border-line database schemas we can find
+in real-world.
+
+Use that feature with caution!
+
 =head1 CONFIGURATION
 
 You have two options for setting a database handle to your class. Either you
@@ -922,30 +959,7 @@ Coat::Persistent initialize it.
 If you already have a database handle, use Coat::Persistent->set_dbh($dbh),
 otherwise, use the DBI mapping explained below.
 
-=head2 ABOUT PRIMARY KEY SEQUENCES
-
-You can choose either to let Coat::Persistent set itself primary key values 
-for new entries, or tell it to let the underlying database do it.
-
-If your database handles sequences itself, it's recommended to disable
-Coat::Persistent's internal sequence engine.
-
-This is done by calling Coat::Persistent->disable_internal_sequence_engine();
-before any call to map_to_dbi() or set_dbh().
-
-Make sure you disable the internal sequence engine before initializing the $dbh,
-otherwise the two tables needed by DBIx::Sequence will be created in your DB 
-(dbix_sequence_release and dbix_sequence_state).
-
-A typical use of a MySQL database with auto_increment primary keys woudl like
-the following:
-
-    # $dbh is an hanlde to a MySQL DB
-    Coat::Persistent->disable_internal_sequence_engine();
-    Coat::Persistent->set_dbh($dbh);
-
-
-=head2 ALREADY EXISTING DATABASE HANDLE
+head2 ALREADY EXISTING DATABASE HANDLE
 
 You may want to tell Coat::Persistent to use a $dbh you already have in hands,
 then you can use the set_dbh() method.
@@ -1032,6 +1046,28 @@ Example:
     __PACKAGE__->map_to_dbi('mysql' => 'dbname', 'dbuser', 'dbpass' );
 
 =back
+
+=head2 MYSQL AUTO-INCREMENT FEATURE
+
+When using MySQL, you can choose either to let Coat::Persistent set itself 
+primary key values for new entries, or use MySQL auto_increment mechanism.
+
+This is done by calling Coat::Persistent->disable_internal_sequence_engine();
+before any call to map_to_dbi() or set_dbh().
+
+Currently, this is only tested to work with MySQL, patches for supporting 
+other database engines are welcome.
+
+Make sure you disable the internal sequence engine before initializing the $dbh,
+otherwise the two tables needed by DBIx::Sequence will be created in your DB 
+(dbix_sequence_release and dbix_sequence_state).
+
+A typical use of a MySQL database with auto_increment primary keys woudl like
+the following:
+
+    # $dbh is an hanlde to a MySQL DB
+    Coat::Persistent->disable_internal_sequence_engine();
+    Coat::Persistent->set_dbh($dbh);
 
 =head2 CACHING
 
