@@ -922,7 +922,33 @@ Coat::Persistent initialize it.
 If you already have a database handle, use Coat::Persistent->set_dbh($dbh),
 otherwise, use the DBI mapping explained below.
 
-=head2 Setting an existing database handle
+=head2 ABOUT PRIMARY KEY SEQUENCES
+
+You can choose either to let Coat::Persistent set itself primary key values 
+for new entries, or tell it to let the underlying database do it.
+
+If your database handles sequences itself, it's recommended to disable
+Coat::Persistent's internal sequence engine.
+
+This is done by calling Coat::Persistent->disable_internal_sequence_engine();
+before any call to map_to_dbi() or set_dbh().
+
+Make sure you disable the internal sequence engine before initializing the $dbh,
+otherwise the two tables needed by DBIx::Sequence will be created in your DB 
+(dbix_sequence_release and dbix_sequence_state).
+
+A typical use of a MySQL database with auto_increment primary keys woudl like
+the following:
+
+    # $dbh is an hanlde to a MySQL DB
+    Coat::Persistent->disable_internal_sequence_engine();
+    Coat::Persistent->set_dbh($dbh);
+
+
+=head2 ALREADY EXISTING DATABASE HANDLE
+
+You may want to tell Coat::Persistent to use a $dbh you already have in hands,
+then you can use the set_dbh() method.
 
 =over 4
 
