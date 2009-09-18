@@ -1,5 +1,5 @@
 # This test is here to validate that C::P works without DBIx::Sequence
-use Test::More tests => 5;
+use Test::More tests => 10;
 
 {
     package Book;
@@ -30,7 +30,7 @@ SKIP: {
     Test::Database->import;
     
     # MySQL tests
-    my ($mysql) = Test::Database->handles( dbd => 'mysql' );
+    my ($mysql) = Test::Database->handles( 'mysql' );
     skip "No MySQL database handle available", 5 unless defined $mysql;
 
     $dbh = $mysql->dbh;
@@ -58,7 +58,7 @@ SKIP: {
 
     # SQLite tests
 
-    my ($sqlite) = Test::Database->handles( dbd => 'SQLite' );
+    my ($sqlite) = Test::Database->handles( 'SQLite' );
     skip "No SQLite database handle available", 5 unless defined $sqlite;
 
     $dbh = $sqlite->dbh;
