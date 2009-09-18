@@ -161,12 +161,18 @@ sub map_to_dbi {
 # This is used if you already have a dbh instead of creating one with 
 # map_to_dbi 
 sub set_dbh {
-    my ($class, $dbh) = @_;
-    confess "Cannot set an undefined dbh" unless defined $dbh;
+    my ($class, $driver, $dbh) = @_;
+    confess "Cannot set an undefined dbh" 
+        unless defined $dbh;
+    confess "Driver '$driver' is not supported" 
+        unless defined exists $class->drivers->{$driver};
 
     $class = '!default' if $class eq 'Coat::Persistent';
     $MAPPINGS->{'!dbh'}{$class} = $dbh;
-    _create_dbix_sequence_tables($MAPPINGS->{'!dbh'}{$class}) if has_internal_sequence_engine();
+    $MAPPINGS->{'!driver'}{$class} = $driver;
+    
+    _create_dbix_sequence_tables($MAPPINGS->{'!dbh'}{$class}) 
+        if has_internal_sequence_engine();
 }
 
 # This is done to wrap the original Coat::has method so we can
@@ -723,7 +729,7 @@ sub save {
           or confess "Unable to execute query \"$sql\" : $DBI::errstr";
 
         # Retrieve the primary key's value
-        $self->$primary_key($sth->{mysql_insertid} || $sth->{insertid}) 
+        $self->$primary_key($class->get_last_insert_id($sth))
             if (defined $primary_key && !has_internal_sequence_engine());
 
         $self->{_db_state} = CP_ENTRY_EXISTS;
@@ -745,6 +751,23 @@ sub save {
 ##############################################################################
 # Private methods
 
+# return the last insert id for any DBD supported
+# raise an exception if the DBD is not supported
+sub get_last_insert_id {
+    my ($class, $sth) = @_;
+    my $dbh = $class->dbh;
+    my $driver = $class->driver;
+
+    if ($driver eq 'mysql') {
+        return $sth->{mysql_insertid} || $sth->{insertid};
+    }
+    elsif ($driver eq 'sqlite') {
+        return $dbh->func('last_insert_rowid');
+    }
+    else {
+        confess "DB driver '$driver' is not supported for last_insert_id";
+    }
+}
 
 # instance method & stuff
 sub _bind_code_to_symbol {
@@ -956,8 +979,13 @@ You have two options for setting a database handle to your class. Either you
 already have a dbh an you set it to your class, or you don't and you let
 Coat::Persistent initialize it.
 
-If you already have a database handle, use Coat::Persistent->set_dbh($dbh),
-otherwise, use the DBI mapping explained below.
+If you already have a database handle, use:
+
+    # $driver is the driver name of the database handle (mysql, sqlite, ...)
+    # $dbh is the database handle previously inititalized
+    Coat::Persistent->set_dbh( $driver => $dbh);
+
+Otherwise, use the DBI mapping explained below.
 
 head2 ALREADY EXISTING DATABASE HANDLE
 
@@ -966,7 +994,7 @@ then you can use the set_dbh() method.
 
 =over 4
 
-=item B<set_dbh($dbh)>
+=item B<set_dbh($driver => $dbh)>
 
 Set the given database handle for the calling class (set it by default if class
 is Coat::Persistent).
@@ -1067,7 +1095,7 @@ the following:
 
     # $dbh is an hanlde to a MySQL DB
     Coat::Persistent->disable_internal_sequence_engine();
-    Coat::Persistent->set_dbh($dbh);
+    Coat::Persistent->set_dbh(mysql => $dbh);
 
 =head2 CACHING
 

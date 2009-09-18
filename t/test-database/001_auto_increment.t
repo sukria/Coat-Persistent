@@ -1,6 +1,5 @@
 # This test is here to validate that C::P works without DBIx::Sequence
 use Test::More tests => 5;
-use Test::Database;
 
 {
     package Book;
@@ -23,17 +22,21 @@ use Test::Database;
     }
 }
 
-my ($mysql) = Test::Database->handles( dbd => 'mysql' );
-
+my $dbh;
 SKIP: {
-          
+    # init
+    eval "use Test::Database";
+    skip "Test::Database is needed", 5 if $@;
+    Test::Database->import;
+    
+    # MySQL tests
+    my ($mysql) = Test::Database->handles( dbd => 'mysql' );
     skip "No MySQL database handle available", 5 unless defined $mysql;
 
-    my $dbh = $mysql->dbh;
+    $dbh = $mysql->dbh;
     Coat::Persistent->disable_internal_sequence_engine();
-    Coat::Persistent->set_dbh($dbh);
+    Coat::Persistent->set_dbh(mysql => $dbh);
 
-    # Fixtures
     eval { $dbh->do("CREATE TABLE books (
         id int(11) not null auto_increment, 
         name varchar(30) not null default '',
@@ -41,7 +44,6 @@ SKIP: {
         primary key (id)
     )") };
 
-    # tests
 
     my $b = Book->new(name => 'Ubik');
     ok($b->save, 'save works');
@@ -50,6 +52,34 @@ SKIP: {
     ok($b->created_at->epoch, 'created_at is a Class::Date object: '.$b->created_at->epoch);
 
     my $c = Book->create(name => 'Blade Runner');
+    is(2, $c->id, 'second object inserted got id 2');
+
+    $dbh->do('DROP TABLE books');
+
+    # SQLite tests
+
+    my ($sqlite) = Test::Database->handles( dbd => 'SQLite' );
+    skip "No SQLite database handle available", 5 unless defined $sqlite;
+
+    $dbh = $sqlite->dbh;
+    Coat::Persistent->disable_internal_sequence_engine();
+    Coat::Persistent->set_dbh(sqlite => $dbh);
+
+    # Fixtures
+    eval { $dbh->do("CREATE TABLE books (
+        id INTEGER PRIMARY KEY, 
+        name varchar(30) ,
+        created_at TIMESTAMP
+    )") };
+
+    # tests
+    $b = Book->new(name => 'Ubik');
+    ok($b->save, 'save works');
+    is(1, $b->id, 'first object inserted got id 1');
+    ok($b->created_at, 'field created_at is set');
+    ok($b->created_at->epoch, 'created_at is a Class::Date object: '.$b->created_at->epoch);
+
+    $c = Book->create(name => 'Blade Runner');
     is(2, $c->id, 'second object inserted got id 2');
 
     # cleanup
