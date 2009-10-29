@@ -18,6 +18,14 @@ coerce 'Class::Date'
     => from 'UnixTimestamp'
     => via { Class::Date->new($_) };
 
+coerce 'Class::Date'
+    => from 'Date'
+    => via { Class::Date->new($_) };
+
+coerce 'Class::Date'
+    => from 'DateTime'
+    => via { Class::Date->new($_) };
+
 subtype 'DateTime'
     => as 'Str'
     => where { /^\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d$/ };
