@@ -1,5 +1,5 @@
 # This test is here to validate that C::P works without DBIx::Sequence
-use Test::More tests => 10;
+use Test::More;
 
 {
     package Book;
@@ -23,65 +23,66 @@ use Test::More tests => 10;
 }
 
 my $dbh;
-SKIP: {
-    # init
-    eval "use Test::Database";
-    skip "Test::Database is needed", 5 if $@;
-    Test::Database->import;
-    
-    # MySQL tests
-    my ($mysql) = Test::Database->handles( 'mysql' );
-    skip "No MySQL database handle available", 5 unless defined $mysql;
 
-    $dbh = $mysql->dbh;
-    Coat::Persistent->disable_internal_sequence_engine();
-    Coat::Persistent->set_dbh(mysql => $dbh);
-
-    eval { $dbh->do("CREATE TABLE books (
-        id int(11) not null auto_increment, 
-        name varchar(30) not null default '',
-        created_at datetime not null,
-        primary key (id)
-    )") };
+# init
+eval "use Test::Database";
+plan skip_all => "Test::Database is needed" if $@;
 
 
-    my $b = Book->new(name => 'Ubik');
-    ok($b->save, 'save works');
-    is(1, $b->id, 'first object inserted got id 1');
-    ok($b->created_at, 'field created_at is set');
-    ok($b->created_at->epoch, 'created_at is a Class::Date object: '.$b->created_at->epoch);
+# MySQL tests
+my ($mysql) = Test::Database->handles( 'mysql' );
+plan skip_all => "No MySQL database handle available" 
+    unless defined $mysql;
 
-    my $c = Book->create(name => 'Blade Runner');
-    is(2, $c->id, 'second object inserted got id 2');
+plan tests => 10;
+$dbh = $mysql->dbh;
+Coat::Persistent->disable_internal_sequence_engine();
+Coat::Persistent->set_dbh(mysql => $dbh);
 
-    $dbh->do('DROP TABLE books');
+eval { $dbh->do("CREATE TABLE books (
+    id int(11) not null auto_increment, 
+    name varchar(30) not null default '',
+    created_at datetime not null,
+    primary key (id)
+)") };
 
-    # SQLite tests
 
-    my ($sqlite) = Test::Database->handles( 'SQLite' );
-    skip "No SQLite database handle available", 5 unless defined $sqlite;
+my $b = Book->new(name => 'Ubik');
+ok($b->save, 'save works');
+is(1, $b->id, 'first object inserted got id 1');
+ok($b->created_at, 'field created_at is set');
+ok($b->created_at->epoch, 'created_at is a Class::Date object: '.$b->created_at->epoch);
 
-    $dbh = $sqlite->dbh;
-    Coat::Persistent->disable_internal_sequence_engine();
-    Coat::Persistent->set_dbh(sqlite => $dbh);
+my $c = Book->create(name => 'Blade Runner');
+is(2, $c->id, 'second object inserted got id 2');
 
-    # Fixtures
-    eval { $dbh->do("CREATE TABLE books (
-        id INTEGER PRIMARY KEY, 
-        name varchar(30) ,
-        created_at TIMESTAMP
-    )") };
+$dbh->do('DROP TABLE books');
 
-    # tests
-    $b = Book->new(name => 'Ubik');
-    ok($b->save, 'save works');
-    is(1, $b->id, 'first object inserted got id 1');
-    ok($b->created_at, 'field created_at is set');
-    ok($b->created_at->epoch, 'created_at is a Class::Date object: '.$b->created_at->epoch);
+# SQLite tests
 
-    $c = Book->create(name => 'Blade Runner');
-    is(2, $c->id, 'second object inserted got id 2');
+my ($sqlite) = Test::Database->handles( 'SQLite' );
+skip "No SQLite database handle available", 5 unless defined $sqlite;
 
-    # cleanup
-    $dbh->do('DROP TABLE books');
-};
+$dbh = $sqlite->dbh;
+Coat::Persistent->disable_internal_sequence_engine();
+Coat::Persistent->set_dbh(sqlite => $dbh);
+
+# Fixtures
+eval { $dbh->do("CREATE TABLE books (
+    id INTEGER PRIMARY KEY, 
+    name varchar(30) ,
+    created_at TIMESTAMP
+)") };
+
+# tests
+$b = Book->new(name => 'Ubik');
+ok($b->save, 'save works');
+is(1, $b->id, 'first object inserted got id 1');
+ok($b->created_at, 'field created_at is set');
+ok($b->created_at->epoch, 'created_at is a Class::Date object: '.$b->created_at->epoch);
+
+$c = Book->create(name => 'Blade Runner');
+is(2, $c->id, 'second object inserted got id 2');
+
+# cleanup
+$dbh->do('DROP TABLE books');
