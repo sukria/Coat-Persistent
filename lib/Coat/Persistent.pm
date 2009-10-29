@@ -301,7 +301,7 @@ sub has_one {
     my $attr_name = (defined $options{class_name}) ? $name : $owned_table_name ;
 
     # record the foreign key
-    my $foreign_key = $owned_table_name . '_' . $owned_primary_key;
+    my $foreign_key = $options{foreign_key} || ($owned_table_name . '_' .  $owned_primary_key);
     has_p $foreign_key => ( isa => 'Int', '!caller' => $class );
 
     my $symbol = "${class}::${attr_name}";
@@ -719,11 +719,13 @@ sub save {
                 $table_name, { %values, $primary_key => $self->$primary_key });
         }
         else {
+            map { delete $values{$_} unless defined $values{$_} } keys %values;
+            #warn "values: ".join(", ", keys(%values));
             ($sql, @values) = $sql_abstract->insert($table_name, \%values);
         }
         
         # execute the query
-        #warn "sql: $sql ".join(', ', @values);
+        # warn "sql: $sql ".join(', ', @values);
         my $sth = $dbh->prepare($sql);
         $sth->execute( @values )
           or confess "Unable to execute query \"$sql\" : $DBI::errstr";
