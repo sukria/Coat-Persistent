@@ -55,6 +55,7 @@ sub cache {
     undef;
 }
 
+
 # The internel sequence engine (DBIx::Sequence)
 # If disabled, nothing will be done for the primary keys, their values
 # should be set by the underlying DB.
@@ -128,20 +129,23 @@ sub add_driver {
 sub map_to_dbi {
     my ( $class, $driver, @options ) = @_;
     confess "Static method cannot be called from instance" if ref $class;
+    my $connect_options = {  PrintError => 0, RaiseError => 0 };
 
     # if map_to_dbi is called from Coat::Persistent, this is the default dbh
     $class = '!default' if $class eq 'Coat::Persistent';
 
     my $drivers = Coat::Persistent->drivers;
 
+    
     confess "No such driver : $driver, please register the driver first with add_driver()"
       unless exists $drivers->{$driver};
 
     # the csv driver needs to load the appropriate DBD module
     if ($driver eq 'csv') {
-        eval "use DBD::CSV";
+        eval "use DBD::CSV 0.22";
         confess "Unable to load DBD::CSV : $@" if $@;
         DBD::CSV->import;
+        $connect_options->{csv_null} = 1; # since version 0.25 we have to do that to preserve undef values
     }
 
     $MAPPINGS->{'!driver'}{$class} = $driver;
@@ -149,7 +153,7 @@ sub map_to_dbi {
     my ( $table, $user, $pass ) = @options;
     $driver = $drivers->{$driver};
     $MAPPINGS->{'!dbh'}{$class} =
-      DBI->connect( "${driver}:${table}", $user, $pass, { PrintError => 0, RaiseError => 0 });
+      DBI->connect( "${driver}:${table}", $user, $pass, $connect_options);
        
     confess "Can't connect to database ${DBI::err} : ${DBI::errstr}"
         unless $MAPPINGS->{'!dbh'}{$class};
@@ -231,6 +235,7 @@ sub has_p {
 
     # find_or_create_by_
     my $sub_find_or_create = sub {
+
         # if 2 args : we're given the value of $attr only
         if (@_ == 2) {
             my ($class, $value) = @_;
@@ -509,7 +514,6 @@ sub find {
 sub find_by_sql {
     my ( $class, $sql, @values ) = @_;
     my @objects;
-#    warn "find_by_sql\n\tsql: $sql\n\tval: @values\n";
 
     # if cached, try to returned a cached value
     if (defined $class->cache) {
@@ -538,7 +542,9 @@ sub find_by_sql {
             # create the object with attributes, and set virtual ones
             foreach my $r (@$rows) {
 
-                my $obj = $class->new(map { ($_ => $r->{$_}) } @given_attr);
+                my %attributes = map { ($_ => $r->{$_}) } @given_attr;
+
+                my $obj = $class->new(%attributes);
                 $obj->init_on_find();
                 foreach my $field (@virtual_attr) {
                     $obj->{$field} = $r->{$field};
@@ -626,6 +632,7 @@ sub delete {
 # Class->create([ { foo => 'x' }, {...}, ... ]); # multiple creation
 sub create {
     # if only two args, we should have an ARRAY containing HASH
+
     if (@_ == 2) {
         my ($class, $values) = @_;
         confess "create received only two args but no ARRAY" 
@@ -678,6 +685,9 @@ sub save {
 
     # a hash containing attr/value pairs for the current object
     my %values = map { $_ => $self->get_storage_value_for($_) } @fields;
+#    foreach my $k (keys %values) {
+#        delete $values{$k} if not defined $values{$k};
+#    }
 
     # if not a new object, we have to update
     if ( $self->_db_state == CP_ENTRY_EXISTS ) {
@@ -725,7 +735,7 @@ sub save {
         }
         
         # execute the query
-        # warn "sql: $sql ".join(', ', @values);
+        #warn "sql: $sql ".join(', ', @values);
         my $sth = $dbh->prepare($sql);
         $sth->execute( @values )
           or confess "Unable to execute query \"$sql\" : $DBI::errstr";
