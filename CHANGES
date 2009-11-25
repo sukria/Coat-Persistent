@@ -1,3 +1,6 @@
+2009-11-25  - 0.221 Alexis Sukrieh
+	* support for DBD::CSV >= 0.22
+
 2009-07-10  - 0.220 - Alexis Sukrieh
     * Add support for undefined primary_keys (bug #47772)
     * Now possible to bypass DBIx::Sequence (bug #47773)
