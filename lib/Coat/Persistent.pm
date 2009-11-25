@@ -27,7 +27,7 @@ use constant CP_ENTRY_EXISTS => 1;
 use vars qw($VERSION @EXPORT $AUTHORITY);
 use base qw(Exporter);
 
-$VERSION   = '0.222';
+$VERSION   = '0.223';
 $AUTHORITY = 'cpan:SUKRIA';
 @EXPORT    = qw(has_p has_one has_many);
 
