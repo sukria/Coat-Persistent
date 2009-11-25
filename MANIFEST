@@ -1,7 +1,6 @@
 CHANGES
 COPYING
 lib/Coat/Persistent/Constraint.pm
-lib/Coat/Persistent/DataTypeFixes.pm
 lib/Coat/Persistent/Meta.pm
 lib/Coat/Persistent/Object.pm
 lib/Coat/Persistent.pm
