@@ -63,7 +63,7 @@ __END__
 
 =head1 NAME 
 
-Coat::Persistent::Types
+Coat::Persistent::Types - set of types and coercions that are of common use when dealing with an database
 
 =head1 DESCRIPTION
 
