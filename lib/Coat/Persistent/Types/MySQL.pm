@@ -50,7 +50,7 @@ __END__
 
 =head1 NAME
 
-Coat::Persistent::Types::MySQL -- Attribute types and coercions for MySQL data types
+Coat::Persistent::Types::MySQL - Attribute types and coercions for MySQL data types
 
 =head1 DESCRIPTION
 
